@@ -1,0 +1,5 @@
+sanic
+sanic_cors
+neo4j
+
+python-dotenv
