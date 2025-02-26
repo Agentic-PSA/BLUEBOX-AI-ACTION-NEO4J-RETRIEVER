@@ -15,10 +15,11 @@ class Neo4jConnector:
     def get_neo4j_session(self):
         return self.driver.session()
 
-    def add_node(self, node_type, properties):
+    def add_node(self, labels: list, properties: dict):
+        labels = [f"`{label}`" if ' ' in label else label for label in labels]
         with self.get_neo4j_session() as session:
-            query = f"CREATE (n:{node_type} {{"
-            query += ", ".join([f"{key}: ${key}" for key in properties.keys()])
+            query = f"CREATE (n:{':'.join(labels)} {{"
+            query += ", ".join([f"`{key}`: $`{key}`" for key in properties.keys()])
             query += "}) RETURN n"
             logging.warning(query)
             result = session.execute_write(self._execute_query, query, properties)
