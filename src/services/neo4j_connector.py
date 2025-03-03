@@ -27,19 +27,20 @@ class Neo4jConnector:
                 return self._serialize_node(result["n"])
             return None
 
-    def add_property_node(self, product_node: dict, property_name: str, property_value, relationship_properties: dict = None):
-        PROPERTY_LABEL = "Property"
+    def add_property_node(self, product_node: dict, property_name: str, property_value, property_label: str, relationship_properties: dict = None):
+        property_label = f"`{property_label}`" if ' ' in property_label else property_label
+        property_data = {"property_value": property_value, "property_name": property_name}
         try:
             with self.get_neo4j_session() as session:
-                query = f"MATCH (n:{PROPERTY_LABEL} {{`{property_name}`: $property_value}}) RETURN n"
+                query = f"MATCH (n:{property_label} {{`name`: $property_name, `value`: $property_value}}) RETURN n"
                 logging.warning(query)
-                result = session.execute_read(self._execute_query, query, {"property_value": property_value})
+                result = session.execute_read(self._execute_query, query, property_data)
 
                 if result is None:
                     logging.warning(f"Creating node")
-                    query = f"CREATE (n:{PROPERTY_LABEL} {{`{property_name}`: $property_value}}) RETURN n"
+                    query = f"CREATE (n:{property_label} {{`name`: $property_name, `value`: $property_value}}) RETURN n"
                     logging.warning(query)
-                    result = session.execute_write(self._execute_query, query, {"property_value": property_value})
+                    result = session.execute_write(self._execute_query, query, property_data)
                     logging.warning(result)
                 else:
                     logging.warning(f"Node exists")
@@ -68,7 +69,7 @@ class Neo4jConnector:
                 logging.warning("relationship_result")
                 logging.warning(relationship_result)
                 if relationship_result is not None:
-                    return self._serialize_node(relationship_result["r"])
+                    return self._serialize_relationship(relationship_result["r"])
         except Exception as e:
             logging.error(f"Error in add_property_node: {str(e)}")
         return None
@@ -84,4 +85,10 @@ class Neo4jConnector:
             "element_id": node.element_id,
             "labels": list(node.labels),
             "properties": dict(node)
+        }
+    @staticmethod
+    def _serialize_relationship(relationship):
+        return {
+            "element_id": relationship.element_id,
+            "properties": dict(relationship)
         }
