@@ -6,6 +6,7 @@ from sanic import Sanic
 from sanic_cors import CORS
 
 from .services import Neo4jConnector
+from .utils import UnitConverter
 
 from .api import AddNode
 from .api import AddProduct
@@ -22,6 +23,7 @@ def get_app(root_path: str) -> Sanic:
 
 
     app.ctx.NEO4J = Neo4jConnector()
+    #app.ctx.UNIT_CONVERTER = UnitConverter()
 
     app.add_route(AddNode.as_view(), 'add_node/')
     app.add_route(AddProduct.as_view(), 'add_product/')

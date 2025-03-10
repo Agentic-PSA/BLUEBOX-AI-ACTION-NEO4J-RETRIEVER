@@ -21,13 +21,18 @@ class AddProduct(HTTPMethodView):
         if region:
             labels.append(f"Region {region}")
         # dodanie głównego node produktu
-        product_node = request.app.ctx.NEO4J.add_node(labels, {})
+        main_node_properties = {}
+        if 'EAN' in properties:
+            main_node_properties['EAN'] = properties['EAN']
+        product_node = request.app.ctx.NEO4J.add_node(labels, main_node_properties)
 
         for language_key, sections in properties.items():
-            if language_key == 'region':
+            if not isinstance(sections, list):
                 continue
 
             for section in sections:
+                if not isinstance(section, dict):
+                    continue
                 section_name = section.get('section_name', '')
                 section_attributes = section.get('attributes', {})
                 for attribute, value in section_attributes.items():
