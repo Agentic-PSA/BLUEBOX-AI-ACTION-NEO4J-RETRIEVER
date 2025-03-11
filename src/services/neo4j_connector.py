@@ -95,6 +95,11 @@ class Neo4jConnector:
         return result.single()
 
     @staticmethod
+    def _execute_query_multiple(tx, query, parameters):
+        result = tx.run(query, parameters)
+        return result.values()
+
+    @staticmethod
     def _serialize_node(node):
         return {
             "element_id": node.element_id,
@@ -173,3 +178,34 @@ class Neo4jConnector:
         except Exception as e:
             logger.error(f"Error in add_unit_property_node: {str(e)}")
         return None
+
+    @staticmethod
+    def _serialize_product(record):
+        product = record[0]
+        relationship = record[1]
+        property_node = record[2]
+
+        return {
+            "product": {
+                "element_id": product.element_id,
+                "labels": list(product.labels),
+                "properties": dict(product)
+            },
+            "relationship": {
+                "element_id": relationship.element_id,
+                "type": relationship.type,
+                "properties": dict(relationship)
+            },
+            "property": {
+                "element_id": property_node.element_id,
+                "labels": list(property_node.labels),
+                "properties": dict(property_node)
+            }
+        }
+
+    def get_product(self, ean: str):
+        with self.get_neo4j_session() as session:
+            query = "MATCH (product {EAN: $ean})-[r:HAS]->(property) RETURN product, r, property"
+            properties = {"ean": ean}
+            result = session.execute_read(self._execute_query_multiple, query, properties)
+            return [self._serialize_product(record) for record in result]
