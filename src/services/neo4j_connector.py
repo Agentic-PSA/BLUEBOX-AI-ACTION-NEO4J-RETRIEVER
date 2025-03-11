@@ -112,7 +112,8 @@ class Neo4jConnector:
         try:
             unit_variants = self.units_converter.convert_to_variants(property_value, property_unit)
             logger.info(f"Unit variants: {unit_variants}")
-            with self.get_neo4j_session() as session:
+            with (self.get_neo4j_session() as session):
+                property_nodes_ids = []
                 for key, value in unit_variants.items():
                     property_data = {"property_name": property_name,
                                      "property_value": value,
@@ -145,6 +146,7 @@ class Neo4jConnector:
                         "property_node_id": int(property_node["element_id"]),
                         "product_node_id": int(product_node["element_id"])
                     }
+                    property_nodes_ids.append(property_node["element_id"])
                     if relationship_properties:
                         parameters.update(relationship_properties)
 
@@ -153,6 +155,20 @@ class Neo4jConnector:
                     relationship_result = session.execute_write(self._execute_query, relationship_query, parameters)
                     logger.info("relationship_result")
                     logger.info(relationship_result)
+
+                for i in range(len(property_nodes_ids)):
+                    for j in range(i+1, len(property_nodes_ids)):
+                        query = "MATCH (a) WHERE id(a) = $property_node_id1 " + \
+                                "MATCH (b) WHERE id(b) = $property_node_id2 " + \
+                                "MERGE (a)-[r:IS_EQUAL]-(b) " + \
+                                "RETURN r"
+                        logger.info(query)
+                        parameters = {
+                            "property_node_id1": int(property_nodes_ids[i]),
+                            "property_node_id2": int(property_nodes_ids[j])
+                        }
+                        session.execute_write(self._execute_query, query, parameters)
+
 
         except Exception as e:
             logger.error(f"Error in add_unit_property_node: {str(e)}")

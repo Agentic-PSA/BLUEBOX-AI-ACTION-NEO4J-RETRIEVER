@@ -16,7 +16,7 @@ units_variants = {
     "lm / m ** 2": ["lm / m ** 2", "cd / m ** 2", "lx"],
     "s": ["s", "ms", "us", "ns", "min", "h", "d"],
     "A": ["A", "mA", "uA", "nA"],
-    "Ah": ["Ah", "A*s"],
+    "Ah": ["Ah", "A*s", "mAh"],
     "°C": ["°C", "K", "°F"],
 
 }
