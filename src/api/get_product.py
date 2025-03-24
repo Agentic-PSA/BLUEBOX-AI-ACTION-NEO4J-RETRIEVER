@@ -32,8 +32,8 @@ class GetProduct(HTTPMethodView):
             value = property_node.get("value")
             unit = property_node.get("unit")
             for label in property.get("labels", []):
-                if label.startswith("Property "):
-                    language = label.replace("Property ", "")
+                if label.startswith("Property_"):
+                    language = label.replace("Property_", "")
                     if language not in formatted_response:
                         formatted_response[language] = {}
                     if section_name not in formatted_response[language]:

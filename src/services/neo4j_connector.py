@@ -205,7 +205,8 @@ class Neo4jConnector:
 
     def get_product(self, ean: str):
         with self.get_neo4j_session() as session:
-            query = "MATCH (product {EAN: $ean})-[r:HAS]->(property) RETURN product, r, property"
+            query = "MATCH (product:Product {EAN: $ean})-[r:HAS]->(property) RETURN product, r, property"
             properties = {"ean": ean}
             result = session.execute_read(self._execute_query_multiple, query, properties)
+            logger.debug(result)
             return [self._serialize_product(record) for record in result]
