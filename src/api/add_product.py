@@ -17,13 +17,18 @@ class AddProduct(HTTPMethodView):
         node_type = form.cleaned_data['type'].replace("-", "_")
         properties = form.cleaned_data['properties']
         region = properties.get('region', None)
-        labels = [node_type]
+        labels = ["Product", node_type]
         if region:
-            labels.append(f"Region {region}")
+            labels.append(f"Region_{region}")
         # dodanie głównego node produktu
         main_node_properties = {}
         if 'EAN' in properties:
             main_node_properties['EAN'] = properties['EAN']
+        if 'common' in properties:
+            if isinstance(properties['common'], dict):
+                main_node_properties['name'] = properties['common'].get('Nazwa', '')
+                main_node_properties['product_number'] = properties['common'].get('Product number', '')
+                main_node_properties['producer'] = properties['common'].get('Producent', '')
         product_node = request.app.ctx.NEO4J.add_node(labels, main_node_properties)
 
         for language_key, sections in properties.items():
@@ -38,7 +43,7 @@ class AddProduct(HTTPMethodView):
                 for attribute, value in section_attributes.items():
                     relationship_properties = {'section_name': section_name}
                     response = request.app.ctx.NEO4J.add_property_node(product_node, attribute, value,
-                                                                       f"Property {language_key}",
+                                                                       f"Property_{language_key}",
                                                                        relationship_properties)
 
                     responses.append(response)
