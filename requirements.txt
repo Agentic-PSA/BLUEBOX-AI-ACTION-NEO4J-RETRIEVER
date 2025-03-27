@@ -3,5 +3,8 @@ sanic_cors
 neo4j
 pint
 mip
-
+anthropic
+openai
+py2neo
 python-dotenv
+psycopg2-binary

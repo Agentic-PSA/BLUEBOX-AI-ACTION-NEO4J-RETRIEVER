@@ -3,9 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EAN Search</title>
+    <title>Search</title>
+    <style>
+        #loading {
+            display: none;
+            font-size: 24px;
+        }
+        #query {
+            width: 50%;
+            font-size: 18px;
+        }
+        #result {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
     <script>
-        async function sendPostRequest() {
+        async function sendSearchRequest() {
+            const queryValue = document.getElementById('query').value;
+            const resultContainer = document.getElementById('result');
+            const loadingIcon = document.getElementById('loading');
+            loadingIcon.style.display = 'inline-block';
+            resultContainer.textContent = '';
+            try {
+                const response = await fetch('http://172.19.3.220:5013/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: queryValue })
+                });
+                const result = await response.json();
+                resultContainer.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                resultContainer.textContent = 'Error: ' + error.message;
+            }
+            finally {
+                loadingIcon.style.display = 'none';
+            }
+        }
+
+        async function sendEANSearchRequest() {
             const eanValue = document.getElementById('ean').value;
             const resultContainer = document.getElementById('result');
             try {
@@ -25,9 +63,13 @@
     </script>
 </head>
 <body>
+    <h1>Search</h1>
+    <input type="text" id="query" placeholder="Enter query">
+    <button onclick="sendSearchRequest()" id="button1">Search</button>
+    <div id="loading">⏳ Loading...</div>
     <h1>EAN Search</h1>
     <input type="text" id="ean" placeholder="Enter EAN value">
-    <button onclick="sendPostRequest()">Search</button>
+    <button onclick="sendEANSearchRequest()" id="button2">Search</button>
     <pre id="result"></pre>
 </body>
 </html>

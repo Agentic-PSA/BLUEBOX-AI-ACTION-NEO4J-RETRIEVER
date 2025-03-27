@@ -11,6 +11,7 @@ from .utils import UnitConverter
 from .api import AddNode
 from .api import AddProduct
 from .api import GetProduct
+from .api import Search
 
 
 def get_app(root_path: str) -> Sanic:
@@ -29,6 +30,7 @@ def get_app(root_path: str) -> Sanic:
     app.add_route(AddNode.as_view(), 'add_node/')
     app.add_route(AddProduct.as_view(), 'add_product/')
     app.add_route(GetProduct.as_view(), 'get_product/')
+    app.add_route(Search.as_view(), 'search/')
 
     # app.add_route(Health.as_view(), 'health/')
 

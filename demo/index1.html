@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EAN Search</title>
+    <script>
+        async function sendPostRequest() {
+            const eanValue = document.getElementById('ean').value;
+            const resultContainer = document.getElementById('result');
+            try {
+                const response = await fetch('http://172.19.3.220:5013/get_product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ean: eanValue })
+                });
+                const result = await response.json();
+                resultContainer.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                resultContainer.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>EAN Search</h1>
+    <input type="text" id="ean" placeholder="Enter EAN value">
+    <button onclick="sendPostRequest()">Search</button>
+    <pre id="result"></pre>
+</body>
+</html>
