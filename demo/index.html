@@ -60,6 +60,42 @@
                 resultContainer.textContent = 'Error: ' + error.message;
             }
         }
+
+        async function sendPNSearchRequest() {
+            const pnValue = document.getElementById('pn').value;
+            const resultContainer = document.getElementById('result');
+            try {
+                const response = await fetch('http://172.19.3.220:5013/get_product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pn: pnValue })
+                });
+                const result = await response.json();
+                resultContainer.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                resultContainer.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function sendNameSearchRequest() {
+            const nameValue = document.getElementById('name').value;
+            const resultContainer = document.getElementById('result');
+            try {
+                const response = await fetch('http://172.19.3.220:5013/get_product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: nameValue })
+                });
+                const result = await response.json();
+                resultContainer.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                resultContainer.textContent = 'Error: ' + error.message;
+            }
+        }
     </script>
 </head>
 <body>
@@ -70,6 +106,12 @@
     <h1>EAN Search</h1>
     <input type="text" id="ean" placeholder="Enter EAN value">
     <button onclick="sendEANSearchRequest()" id="button2">Search</button>
+    <h1>PN Search</h1>
+    <input type="text" id="pn" placeholder="Enter PN value">
+    <button onclick="sendPNSearchRequest()" id="button3">Search</button>
+    <h1>Name Search</h1>
+    <input type="text" id="name" placeholder="Enter Name value">
+    <button onclick="sendNameSearchRequest()" id="button4">Search</button>
     <pre id="result"></pre>
 </body>
 </html>

@@ -11,18 +11,29 @@ class GetProduct(HTTPMethodView):
         form = GetProductForm(request.json)
         if not form.is_valid():
             return JSONResponse(body=form.errors, status=400)
-        ean = form.cleaned_data['ean']
-        response = request.app.ctx.NEO4J.get_product(ean)
+        ean = form.cleaned_data.get('ean', None)
+        if ean:
+            formatted_response = {"EAN": ean}
+            response = request.app.ctx.NEO4J.get_product(ean)
+        else:
+            pn = form.cleaned_data.get('pn', None)
+            if pn:
+                formatted_response = {"PN": pn}
+                response = request.app.ctx.NEO4J.get_product_by_pn(pn)
+            else:
+                name = form.cleaned_data.get('name', None)
+                formatted_response = {"name": name}
+                response = request.app.ctx.NEO4J.get_product_by_name(name)
+                return JSONResponse(body=response)
         if not response:
             return JSONResponse(body={"error": "Product not found"}, status=404)
 
-        formatted_response = await GetProduct.format_response(ean, response)
+        formatted_response = await GetProduct.format_response(formatted_response, response)
 
         return JSONResponse(body=formatted_response)
 
     @staticmethod
-    async def format_response(ean, response):
-        formatted_response = {'EAN': ean}
+    async def format_response(formatted_response, response):
         for property_dict in response:
             relationship = property_dict.get("relationship")
             section_name = relationship.get("properties", {}).get("section_name", "")

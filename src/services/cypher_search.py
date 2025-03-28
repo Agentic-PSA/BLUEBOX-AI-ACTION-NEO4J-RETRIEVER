@@ -6,6 +6,7 @@ import time
 import json
 from py2neo import Graph
 import openai
+from neo4j import GraphDatabase
 
 import src.services.product_specification
 import src.services.db_schema
@@ -14,11 +15,25 @@ import src.services.db_schema
 #     api_key="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",
 #     # This is the default and can be omitted
 # )
-
+uri = "neo4j://172.19.3.220:30687"
+driver = GraphDatabase.driver(uri, auth=("neo4j", "testpassword"))
 
 client_gpt = openai.OpenAI(
    api_key="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")
 
+
+
+def llm(prompt):
+    response = client_gpt.chat.completions.create(
+        model="gpt-4o-mini",
+        # reasoning_effort='high',
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"}
+    )
+    print(response)
+    response_text = response.choices[0].message.content
+    print(response_text)
+    return response_text
 
 def search_search_group(descriptions=[]):
     client = Client(verify=False)
@@ -204,6 +219,81 @@ WYMAGANIA TECHNICZNE:
         return parse_json_with_multiline_strings(response_content)
 
 
+def generate_params(question, product_specification, labels):
+
+    # Zapytanie do LLM z elastycznym podejściem
+    prompt = f'''
+Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie parametry do zapytania bazy danych.
+Pola podaj w requiredProperties. Wypełnij tylko te pola, których wartości są podane w pytaniu i które są na liście pól danego typu.
+Ustaw unit na null jeżeli nie jest potrzebne.
+Dostępne jednostki:
+m, in, nm, mm, cm, dm, g, mg, kg, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
+W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: <, >, <=, >.
+
+Pytanie użytkownika:
+{question}
+
+Pola dostępne w wybranych typach produktów:
+{product_specification}
+
+Odpowiedz w formacie json:
+{{
+  "requiredProperties": [
+    {{
+      "name": "",
+      "value": 0,
+      "unit": null
+      "condition": "="
+    }}
+  ]
+}}
+    '''
+
+    #response_content = response_text.replace('```', '').replace('json', '')
+    response_text = llm(prompt)
+    params = json.loads(response_text)
+    return params
+
+
+def exec_query(params):
+    cypher_query = f"""
+MATCH (product:Product)
+OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
+WITH product, collect(prop) as properties
+WHERE size([reqProp IN $requiredProperties WHERE
+  size([prop IN properties WHERE
+    prop.name = reqProp.name AND
+    (
+      (reqProp.condition = '<' AND prop.value < reqProp.value) OR
+      (reqProp.condition = '>' AND prop.value > reqProp.value) OR
+      (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
+      (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
+      (apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
+      (prop.value = reqProp.value)
+    ) AND
+    (reqProp.unit IS NULL OR prop.unit = reqProp.unit)
+  ]) > 0
+]) = size($requiredProperties)
+RETURN product, properties
+"""
+    with driver.session() as session:
+        result = session.run(cypher_query, params)
+        records = list(result)
+        if not len(records):
+            print("Brak wyników")
+        results = [record.data() for record in records]
+        for record in results:
+            if record.get("product", {}).get("nameEmbedding"):
+                del record["product"]["nameEmbedding"]
+        return results
+
+def get_embedding(text, model="text-embedding-3-small"):
+    response = client_gpt.embeddings.create(
+        model=model,
+        input=text
+    )
+    return response.data[0].embedding
+
 def cypher_search(user_query):
     times = {}
     # Krok 1: Wyszukanie typów produktów
@@ -242,46 +332,32 @@ def cypher_search(user_query):
             "types": types
         }
 
-    # Krok 3: Generowanie uproszczonego zapytania Cypher
-    print("\nGenerowanie zapytania Cypher na podstawie pytania użytkownika...")
     try:
         start = time.time()
-        cypher_query_data = generate_simple_cypher_query_with_llm(
-            src.services.db_schema.db_schema,
-            "",
-            user_query,
-            specifications
-        )
+        params = generate_params(user_query, specifications, types)
         end = time.time()
-
-        print(f"Krok 3: Generowanie zapytania Cypher: {end - start} s")
-        times["Krok 3: Generowanie zapytania Cypher"] = end - start
-        print("\nWygenerowane zapytanie Cypher:")
-        cypher_query = cypher_query_data['cypher']
-        print(cypher_query_data)
-        print(cypher_query)
+        print(f"Krok 3: Generowanie parametrów cypher: {end - start} s")
+        times["Krok 3: Generowanie parametrów cypher"] = end - start
     except Exception as e:
         return {
             "success": False,
-            "message": f"Błąd podczas generowania zapytania Cypher: {str(e)}",
+            "message": f"Błąd podczas generowania parametrów Cypher: {str(e)}",
             "times": times,
             "types": types
         }
 
-    start = time.time()
-    graph = Graph("neo4j://172.19.3.220:30687", auth=("neo4j", "testpassword"))
-    end = time.time()
-    print(f"Krok 4: Pobranie danych z NEO: {end - start} s")
-    times["Krok 4: Pobranie danych z NEO"] = end - start
 
     try:
-        results = graph.run(cypher_query).data()
-        print(results)
+        start = time.time()
+        results = exec_query(params)
+        end = time.time()
+        print(f"Krok 4: Odpytanie bazy: {end - start} s")
+        times["Krok 4: Odpytanie bazy"] = end - start
     except Exception as e:
         return {
             "success": False,
-            "message": f"Błąd podczas wykonywania zapytania Cypher: {str(e)}",
-            "query": cypher_query,
+            "message": f"Błąd podczas odpytania bazy: {str(e)}",
+            "params": params,
             "times": times,
             "types": types
         }
@@ -290,7 +366,7 @@ def cypher_search(user_query):
         "success": True,
         "message": f"",
         "results": results,
-        "query": cypher_query,
+        "params": params,
         "times": times,
         "types": types
     }

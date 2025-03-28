@@ -1,9 +1,23 @@
+import openai
 from sanic.log import logger
 import os
 
 from neo4j import GraphDatabase
 from ..utils import UnitConverter
 
+
+def find_similar_products(tx, query_vector):
+    query = """
+    WITH $query_vector AS queryVector
+    MATCH (p:Product)
+    WITH p, gds.similarity.cosine(queryVector, p.nameEmbedding) AS similarity
+    RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, similarity
+    ORDER BY similarity DESC
+    LIMIT 10
+    """
+    result = tx.run(query, query_vector=query_vector)
+    return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
+             "PN": record["PN"], "producer": record["producer"]} for record in result]
 
 class Neo4jConnector:
     def __init__(self):
@@ -210,3 +224,26 @@ class Neo4jConnector:
             result = session.execute_read(self._execute_query_multiple, query, properties)
             logger.debug(result)
             return [self._serialize_product(record) for record in result]
+
+
+    def get_product_by_pn(self, pn: str):
+        with self.get_neo4j_session() as session:
+            query = "MATCH (product:Product {product_number: $pn})-[r:HAS]->(property) RETURN product, r, property"
+            properties = {"pn": pn}
+            result = session.execute_read(self._execute_query_multiple, query, properties)
+            logger.debug(result)
+            return [self._serialize_product(record) for record in result]
+
+    def get_product_by_name(self, name:str):
+        model = "text-embedding-3-small"
+        client_gpt = openai.OpenAI(
+            api_key="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")
+        response = client_gpt.embeddings.create(
+            model=model,
+            input=name
+        )
+        query_vector = response.data[0].embedding
+        with self.driver.session() as session:
+            results = session.read_transaction(find_similar_products, query_vector)
+            logger.debug(results)
+        return results
