@@ -19,6 +19,27 @@ def find_similar_products(tx, query_vector):
     return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
              "PN": record["PN"], "producer": record["producer"]} for record in result]
 
+def find_similar_pn(tx, query_vector):
+    query = """
+    WITH $query_vector AS queryVector
+    MATCH (p:Product)
+    WITH p, gds.similarity.cosine(queryVector, p.productNumberEmbedding) AS similarity
+    RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, similarity
+    ORDER BY similarity DESC
+    LIMIT 5
+    """
+    similarity_100 = False
+    result = tx.run(query, query_vector=query_vector)
+    formatted_results = []
+    for record in result:
+        if record["similarity"] >= 1.0:
+            similarity_100 = True
+        if similarity_100 and record["similarity"] < 1.0:
+            break
+        formatted_results.append({"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
+             "PN": record["PN"], "producer": record["producer"]})
+    return formatted_results
+
 class Neo4jConnector:
     def __init__(self):
         uri = f'bolt://{os.environ.get("NEO4J_HOST")}:{os.environ.get("NEO4J_PORT")}'
@@ -248,12 +269,18 @@ class Neo4jConnector:
 
 
     def get_product_by_pn(self, pn: str):
-        with self.get_neo4j_session() as session:
-            query = "MATCH (product:Product {product_number: $pn})-[r:HAS]->(property) RETURN product, r, property"
-            properties = {"pn": pn}
-            result = session.execute_read(self._execute_query_multiple, query, properties)
-            logger.debug(result)
-            return [self._serialize_product(record) for record in result]
+        model = "text-embedding-3-small"
+        client_gpt = openai.OpenAI(
+            api_key="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")
+        response = client_gpt.embeddings.create(
+            model=model,
+            input=pn
+        )
+        query_vector = response.data[0].embedding
+        with self.driver.session() as session:
+            results = session.read_transaction(find_similar_pn, query_vector)
+            logger.debug(results)
+        return results
 
     def get_product_by_name(self, name:str):
         model = "text-embedding-3-small"

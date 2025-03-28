@@ -18,13 +18,14 @@ class GetProduct(HTTPMethodView):
         else:
             pn = form.cleaned_data.get('pn', None)
             if pn:
-                formatted_response = {"PN": pn}
                 response = request.app.ctx.NEO4J.get_product_by_pn(pn)
+                if response:
+                    return JSONResponse(body=response)
             else:
                 name = form.cleaned_data.get('name', None)
-                formatted_response = {"name": name}
                 response = request.app.ctx.NEO4J.get_product_by_name(name)
-                return JSONResponse(body=response)
+                if response:
+                    return JSONResponse(body=response)
         if not response:
             return JSONResponse(body={"error": "Product not found"}, status=404)
 

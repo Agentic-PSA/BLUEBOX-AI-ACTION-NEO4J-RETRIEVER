@@ -285,6 +285,8 @@ RETURN product, properties
         for record in results:
             if record.get("product", {}).get("nameEmbedding"):
                 del record["product"]["nameEmbedding"]
+            if record.get("product", {}).get("productNumberEmbedding"):
+                del record["product"]["productNumberEmbedding"]
         return results
 
 def get_embedding(text, model="text-embedding-3-small"):
