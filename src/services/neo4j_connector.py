@@ -217,13 +217,34 @@ class Neo4jConnector:
             }
         }
 
+    @staticmethod
+    def generate_ean_variants(ean):
+        variants = [ean]
+        if len(ean) == 13 and ean.startswith('0'):
+            variants.append(ean[1:])
+        if len(ean) == 13 and ean.startswith('00'):
+            variants.append(ean[2:])
+        if len(ean) == 12:
+            variants.append('0' + ean)
+        if len(ean) == 12 and ean.startswith('0'):
+            variants.append(ean[1:])
+        if len(ean) == 11:
+            variants.append('00' + ean)
+            variants.append('0' + ean)
+
+        return variants
+
     def get_product(self, ean: str):
-        with self.get_neo4j_session() as session:
-            query = "MATCH (product:Product {EAN: $ean})-[r:HAS]->(property) RETURN product, r, property"
-            properties = {"ean": ean}
-            result = session.execute_read(self._execute_query_multiple, query, properties)
-            logger.debug(result)
-            return [self._serialize_product(record) for record in result]
+        variants = self.generate_ean_variants(ean)
+        for ean_variant in variants:
+            with self.get_neo4j_session() as session:
+                query = "MATCH (product:Product {EAN: $ean})-[r:HAS]->(property) RETURN product, r, property"
+                properties = {"ean": ean_variant}
+                result = session.execute_read(self._execute_query_multiple, query, properties)
+                logger.debug(result)
+                if result:
+                    return [self._serialize_product(record) for record in result]
+        return None
 
 
     def get_product_by_pn(self, pn: str):
