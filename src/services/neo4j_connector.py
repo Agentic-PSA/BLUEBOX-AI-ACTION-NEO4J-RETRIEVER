@@ -8,12 +8,12 @@ from ..utils import UnitConverter
 
 def find_similar_products(tx, query_vector):
     query = """
-    WITH $query_vector AS queryVector
-    MATCH (p:Product)
-    WITH p, gds.similarity.cosine(queryVector, p.nameEmbedding) AS similarity
-    RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, similarity
-    ORDER BY similarity DESC
-    LIMIT 10
+WITH $query_vector AS queryVector
+MATCH (p:Product)-[:HAS]->(n:Name:Property_PL)
+WITH p, n, gds.similarity.cosine(queryVector, n.embedding) AS similarity
+RETURN n.value AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, similarity
+ORDER BY similarity DESC
+LIMIT 10
     """
     result = tx.run(query, query_vector=query_vector)
     return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
