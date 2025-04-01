@@ -135,6 +135,12 @@ class Neo4jConnector:
         return result.values()
 
     @staticmethod
+    def _execute_query_records(tx, query, parameters):
+        result = tx.run(query, parameters)
+        values = [record.data() for record in result]
+        return values
+
+    @staticmethod
     def _serialize_node(node):
         return {
             "element_id": node.element_id,
@@ -295,3 +301,31 @@ class Neo4jConnector:
             results = session.read_transaction(find_similar_products, query_vector)
             logger.debug(results)
         return results
+
+    def execute_query(self, query, properties={}):
+        with self.get_neo4j_session() as session:
+            result = session.execute_read(self._execute_query_records, query, properties)
+            return result
+
+    def add_bidirectional_relationship_with_properties(self, type1_code, type2_code, relationship_type, relationship_properties1={}, relationship_properties2={}):
+        with self.driver.session() as session:
+            result = session.write_transaction(
+                self._create_bidirectional_relationship_with_properties,
+                type1_code, type2_code, relationship_type, relationship_properties1, relationship_properties2
+            )
+            return result
+
+    @staticmethod
+    def _create_bidirectional_relationship_with_properties(tx, type1_code, type2_code, relationship_type,
+                                                           relationship_properties1, relationship_properties2):
+        query = (
+            "MATCH (a:Type {code: $type1_code}), (b:Type {code: $type2_code}) "
+            f"MERGE (a)-[r1:{relationship_type}]->(b) "
+            "ON CREATE SET r1 += $props1 "
+            f"MERGE (b)-[r2:{relationship_type}]->(a) "
+            "ON CREATE SET r2 += $props2 "
+            "RETURN a, b, r1, r2"
+        )
+        result = tx.run(query, type1_code=type1_code, type2_code=type2_code,
+                        props1=relationship_properties1, props2=relationship_properties2)
+        return result.single()
