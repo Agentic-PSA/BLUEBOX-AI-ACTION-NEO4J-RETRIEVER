@@ -7,6 +7,8 @@ import json
 from py2neo import Graph
 import openai
 from neo4j import GraphDatabase
+from sanic import Sanic
+from sanic.log import logger
 
 import src.services.product_specification
 import src.services.db_schema
@@ -252,14 +254,20 @@ Odpowiedz w formacie json:
     #response_content = response_text.replace('```', '').replace('json', '')
     response_text = llm(prompt)
     params = json.loads(response_text)
+    params["productTypes"] = labels
     return params
 
 
 def exec_query(params):
-    cypher_query = f"""
+    cypher_query = """
 MATCH (product:Product)
+WHERE any(label in $productTypes WHERE label IN labels(product))
 OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
-WITH product, collect(prop) as properties
+WITH product, collect({
+  name: prop.name,
+  value: prop.value,
+  unit: prop.unit
+}) as properties
 WHERE size([reqProp IN $requiredProperties WHERE
   size([prop IN properties WHERE
     prop.name = reqProp.name AND
@@ -296,22 +304,84 @@ def get_embedding(text, model="text-embedding-3-small"):
     )
     return response.data[0].embedding
 
+def analize_query(user_query):
+    prompt = f'''
+Użytkownik może szukać produktów podając jego parametry lub szukać konkretnego produktu podając nazwę.
+Określ jakich typów produktów może dotyczyć pytanie lub jeżeli pytanie dotyczy konkretnego produktu o podanej nazwie podaj jego nazwę.
+Odpowiedz w formacie json:
+{{"types": ["lodówki", "tablety"]}}
+lub
+{{"name": "Nazwa produktu"}}
+
+Przykłady:
+Pytanie: Telefon z systemem iOS
+Odpowiedź: {{"types": ["telefony komórkowe"]}}
+Pytanie: biały iPhone 13
+Odpowiedź: {{"name": "iPhone 13"}}
+
+
+Pytanie użytkownika:
+{user_query}
+    '''
+    response_text = llm(prompt)
+    data = json.loads(response_text)
+    return data
+
 def cypher_search(user_query):
     times = {}
+    app = Sanic.get_app()
+    try:
+        start = time.time()
+        data = analize_query(user_query)
+        end = time.time()
+        logger.debug(data)
+        logger.info(f"Krok 0: Analiza pytania: {end - start} s")
+        times["Krok 0: Analiza pytania"] = end - start
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Błąd podczas analizy pytania: {str(e)}",
+            "times": times
+        }
+
+    types_query = user_query
+    if "types" in data:
+        types = data["types"]
+        types_query = types[0]
+    elif "name" in data:
+        name = data["name"]
+        return app.ctx.NEO4J.get_product_by_name(name)
+
+
     # Krok 1: Wyszukanie typów produktów
     try:
         start = time.time()
-        types = search_search_group([user_query])
+        types_response = app.ctx.NEO4J.get_similar_types(types_query)
+        types = [t["type_code"] for t in types_response]
         end = time.time()
-        print(f"Krok 1: Wyszukiwanie typów produktów: {end - start} s")
+        logger.info(f"Krok 1: Wyszukiwanie typów produktów: {end - start} s")
         times["Krok 1: Wyszukiwanie typów produktów"] = end - start
-        print(types)
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas wyszukiwania typów produktów: {str(e)}",
             "times": times
         }
+
+    # Krok 1: Wyszukanie typów produktów
+    # try:
+    #     start = time.time()
+    #     types = search_search_group([user_query])
+    #     end = time.time()
+    #     print(f"Krok 1: Wyszukiwanie typów produktów: {end - start} s")
+    #     times["Krok 1: Wyszukiwanie typów produktów"] = end - start
+    #     print(types)
+    # except Exception as e:
+    #     return {
+    #         "success": False,
+    #         "message": f"Błąd podczas wyszukiwania typów produktów: {str(e)}",
+    #         "times": times
+    #     }
 
 
     # Krok 2: Pobierz formatki wybranych typów produktów
@@ -320,32 +390,33 @@ def cypher_search(user_query):
         specifications = {}
         for t in types:
             # print(f"Pobieranie specyfikacji dla typu: {t}")
-
-            specifications[type_to_label(t)] = src.services.product_specification.get_product_specification(t)
+            specification = src.services.product_specification.get_product_specification(t)
+            specification = src.services.product_specification.filter_language(specification, "PL")
+            specifications[type_to_label(t)] = specification
         end = time.time()
-        print(f"Krok 2: Pobieranie specyfikacji: {end - start} s")
+        logger.info(f"Krok 2: Pobieranie specyfikacji: {end - start} s")
         times["Krok 2: Pobieranie specyfikacji"] = end - start
-        print(specifications)
+        logger.info(specifications)
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas pobierania specyfikacji produktów: {str(e)}",
             "times": times,
-            "types": types
+            "types": types_response
         }
 
     try:
         start = time.time()
         params = generate_params(user_query, specifications, types)
         end = time.time()
-        print(f"Krok 3: Generowanie parametrów cypher: {end - start} s")
+        logger.info(f"Krok 3: Generowanie parametrów cypher: {end - start} s")
         times["Krok 3: Generowanie parametrów cypher"] = end - start
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas generowania parametrów Cypher: {str(e)}",
             "times": times,
-            "types": types
+            "types": types_response
         }
 
 
@@ -353,7 +424,7 @@ def cypher_search(user_query):
         start = time.time()
         results = exec_query(params)
         end = time.time()
-        print(f"Krok 4: Odpytanie bazy: {end - start} s")
+        logger.info(f"Krok 4: Odpytanie bazy: {end - start} s")
         times["Krok 4: Odpytanie bazy"] = end - start
     except Exception as e:
         return {
@@ -361,7 +432,7 @@ def cypher_search(user_query):
             "message": f"Błąd podczas odpytania bazy: {str(e)}",
             "params": params,
             "times": times,
-            "types": types
+            "types": types_response
         }
 
     return {
@@ -370,7 +441,8 @@ def cypher_search(user_query):
         "results": results,
         "params": params,
         "times": times,
-        "types": types
+        "types": types_response,
+        "types_query": types_query
     }
 
 

@@ -3,6 +3,7 @@ from sanic.log import logger
 import os
 
 from neo4j import GraphDatabase
+
 from ..utils import UnitConverter
 
 
@@ -40,11 +41,30 @@ def find_similar_pn(tx, query_vector):
              "PN": record["PN"], "producer": record["producer"]})
     return formatted_results
 
+def find_similar_type(tx, query_vector, limit=5):
+    query = f"""
+    WITH $query_vector AS queryVector
+    MATCH (t:Type)
+    WITH t, gds.similarity.cosine(queryVector, t.nameEmbedding) AS similarity
+    RETURN t.code AS type_code, t.name AS type_name, similarity
+    ORDER BY similarity DESC
+    LIMIT {limit}
+    """
+
+    result = tx.run(query, query_vector=query_vector)
+    formatted_results = []
+    for record in result:
+        formatted_results.append({"type_code": record["type_code"], "type_name": record["type_name"], "similarity": record["similarity"]})
+    return formatted_results
+
 class Neo4jConnector:
     def __init__(self):
         uri = f'bolt://{os.environ.get("NEO4J_HOST")}:{os.environ.get("NEO4J_PORT")}'
         self.driver = GraphDatabase.driver(uri, auth=(os.environ.get("NEO4J_USER"), os.environ.get("NEO4J_PASSWORD")))
         self.units_converter = UnitConverter()
+        self.client_gpt = openai.OpenAI(
+            api_key="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")
+        self.embeddings_model = "text-embedding-3-small"
 
     def close(self):
         self.driver.close()
@@ -275,11 +295,8 @@ class Neo4jConnector:
 
 
     def get_product_by_pn(self, pn: str):
-        model = "text-embedding-3-small"
-        client_gpt = openai.OpenAI(
-            api_key="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")
-        response = client_gpt.embeddings.create(
-            model=model,
+        response = self.client_gpt.embeddings.create(
+            model=self.embeddings_model,
             input=pn
         )
         query_vector = response.data[0].embedding
@@ -289,16 +306,24 @@ class Neo4jConnector:
         return results
 
     def get_product_by_name(self, name:str):
-        model = "text-embedding-3-small"
-        client_gpt = openai.OpenAI(
-            api_key="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")
-        response = client_gpt.embeddings.create(
-            model=model,
+        response = self.client_gpt.embeddings.create(
+            model=self.embeddings_model,
             input=name
         )
         query_vector = response.data[0].embedding
         with self.driver.session() as session:
             results = session.read_transaction(find_similar_products, query_vector)
+            logger.debug(results)
+        return results
+
+    def get_similar_types(self, text:str):
+        response = self.client_gpt.embeddings.create(
+            model=self.embeddings_model,
+            input=text
+        )
+        query_vector = response.data[0].embedding
+        with self.driver.session() as session:
+            results = session.read_transaction(find_similar_type, query_vector)
             logger.debug(results)
         return results
 
