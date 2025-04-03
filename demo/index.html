@@ -106,19 +106,33 @@
     Pokaż parametry
     <button onclick="sendSearchRequest()" id="button1" type="submit" >Search</button>
     <div id="loading">⏳ Loading...</div>
+    <button id="toggleButton">\/</button>
+    <div id="advanced" style="display: none;">
+        <h1>EAN Search</h1>
+        <input type="text" id="ean" placeholder="Enter EAN value">
+        <button onclick="sendEANSearchRequest()" id="button2">Search</button>
+        <h1>PN Search</h1>
+        <input type="text" id="pn" placeholder="Enter PN value">
+        <button onclick="sendPNSearchRequest()" id="button3">Search</button>
+        <h1>Name Search</h1>
+        <input type="text" id="name" placeholder="Enter Name value">
+        <button onclick="sendNameSearchRequest()" id="button4">Search</button>
+    </div>
 
-    <h1>EAN Search</h1>
-    <input type="text" id="ean" placeholder="Enter EAN value">
-    <button onclick="sendEANSearchRequest()" id="button2">Search</button>
-    <h1>PN Search</h1>
-    <input type="text" id="pn" placeholder="Enter PN value">
-    <button onclick="sendPNSearchRequest()" id="button3">Search</button>
-    <h1>Name Search</h1>
-    <input type="text" id="name" placeholder="Enter Name value">
-    <button onclick="sendNameSearchRequest()" id="button4">Search</button>
+
     <pre id="result"></pre>
 
     <script>
+        document.getElementById('toggleButton').addEventListener('click', function() {
+            var div = document.getElementById('advanced');
+            if (div.style.display === 'none') {
+                div.style.display = 'block';
+                this.textContent = '/\\';
+            } else {
+                div.style.display = 'none';
+                this.textContent = '\\/';
+            }
+        });
         document.getElementById('query').addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
                 event.preventDefault();

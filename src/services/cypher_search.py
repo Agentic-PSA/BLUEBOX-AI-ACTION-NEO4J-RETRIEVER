@@ -363,32 +363,50 @@ def cypher_search(user_query, return_parameters=False):
     app = Sanic.get_app()
 
     # Sprawdź EAN
+    ean_response = None
+    start = time.time()
     if check_ean(user_query):
         logger.info(f"Szukanie EAN: {user_query}")
-        response = app.ctx.NEO4J.get_product(user_query)
-        if response:
-            return response
+        ean_response = app.ctx.NEO4J.get_product(user_query)
+    end = time.time()
+    times["Wyszukiwanie EAN"] = end - start
+    if ean_response:
+        return {
+            "success": True,
+            "results": ean_response,
+            "times": times,
+            "time": sum(times.values())
+        }
 
+    start = time.time()
     # Sprawdź PN
     logger.info(f"Szukanie PN: {user_query}")
-    response = check_pn(user_query)
-    logger.info(response)
-    if response:
-        return response
+    pn_response = check_pn(user_query)
 
+    end = time.time()
+    times["Wyszukiwanie PN"] = end - start
+    logger.info(pn_response)
+    if pn_response:
+        return {
+            "success": True,
+            "results": pn_response,
+            "times": times,
+            "time": sum(times.values())
+        }
 
     try:
         start = time.time()
         data = analize_query(user_query)
         end = time.time()
         logger.debug(data)
-        logger.info(f"Krok 0: Analiza pytania: {end - start} s")
-        times["Krok 0: Analiza pytania"] = end - start
+        logger.info(f"Analiza pytania: {end - start} s")
+        times["Analiza pytania"] = end - start
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas analizy pytania: {str(e)}",
-            "times": times
+            "times": times,
+            "time": sum(times.values())
         }
 
     types_query = user_query
@@ -399,7 +417,16 @@ def cypher_search(user_query, return_parameters=False):
         types_query = types[0]
     elif "name" in data:
         name = data["name"]
-        return app.ctx.NEO4J.get_product_by_name(name)
+        start = time.time()
+        end = time.time()
+        name_response = app.ctx.NEO4J.get_product_by_name(name)
+        times["Wyszukiwanie nazwy"] = end - start
+        return {
+            "success": True,
+            "results": name_response,
+            "times": times,
+            "time": sum(times.values())
+        }
     else:
         return None
 
@@ -410,29 +437,16 @@ def cypher_search(user_query, return_parameters=False):
         types_response = app.ctx.NEO4J.get_similar_types(types_query)
         types = [t["type_code"] for t in types_response]
         end = time.time()
-        logger.info(f"Krok 1: Wyszukiwanie typów produktów: {end - start} s")
-        times["Krok 1: Wyszukiwanie typów produktów"] = end - start
+        logger.info(f"Wyszukiwanie typów produktów: {end - start} s")
+        times["Wyszukiwanie typów produktów"] = end - start
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas wyszukiwania typów produktów: {str(e)}",
-            "times": times
+            "times": times,
+            "time": sum(times.values())
         }
 
-    # Krok 1: Wyszukanie typów produktów
-    # try:
-    #     start = time.time()
-    #     types = search_search_group([user_query])
-    #     end = time.time()
-    #     print(f"Krok 1: Wyszukiwanie typów produktów: {end - start} s")
-    #     times["Krok 1: Wyszukiwanie typów produktów"] = end - start
-    #     print(types)
-    # except Exception as e:
-    #     return {
-    #         "success": False,
-    #         "message": f"Błąd podczas wyszukiwania typów produktów: {str(e)}",
-    #         "times": times
-    #     }
 
     #Krok 2: Filtrowanie typów produktów
     try:
@@ -441,16 +455,17 @@ def cypher_search(user_query, return_parameters=False):
         types = data.get("types", [])
         end = time.time()
         logger.debug(data)
-        logger.info(f"Krok 2: Filtrowanie typów produktów: {end - start} s")
-        times["Krok 2: Filtrowanie typów produktów"] = end - start
+        logger.info(f"Filtrowanie typów produktów: {end - start} s")
+        times["Filtrowanie typów produktów"] = end - start
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas filtrowania typów: {str(e)}",
-            "times": times
+            "times": times,
+            "time": sum(times.values())
         }
 
-    # Krok 2: Pobierz formatki wybranych typów produktów
+    # Krok 3: Pobierz formatki wybranych typów produktów
     try:
         start = time.time()
         specifications = {}
@@ -460,29 +475,31 @@ def cypher_search(user_query, return_parameters=False):
             specification = src.services.product_specification.filter_language(specification, "PL")
             specifications[type_to_label(t)] = specification
         end = time.time()
-        logger.info(f"Krok 2: Pobieranie specyfikacji: {end - start} s")
-        times["Krok 2: Pobieranie specyfikacji"] = end - start
+        logger.info(f"Pobieranie specyfikacji: {end - start} s")
+        times["Pobieranie specyfikacji"] = end - start
         logger.info(specifications)
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas pobierania specyfikacji produktów: {str(e)}",
             "times": times,
-            "types": types_response
+            "types": types_response,
+            "time": sum(times.values())
         }
 
     try:
         start = time.time()
         params = generate_params(user_query, specifications, types)
         end = time.time()
-        logger.info(f"Krok 3: Generowanie parametrów cypher: {end - start} s")
-        times["Krok 3: Generowanie parametrów cypher"] = end - start
+        logger.info(f"Generowanie parametrów cypher: {end - start} s")
+        times["Generowanie parametrów cypher"] = end - start
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas generowania parametrów Cypher: {str(e)}",
             "times": times,
-            "types": types_response
+            "types": types_response,
+            "time": sum(times.values())
         }
 
 
@@ -490,15 +507,16 @@ def cypher_search(user_query, return_parameters=False):
         start = time.time()
         results = exec_query(params, return_parameters)
         end = time.time()
-        logger.info(f"Krok 4: Odpytanie bazy: {end - start} s")
-        times["Krok 4: Odpytanie bazy"] = end - start
+        logger.info(f"Odpytanie bazy: {end - start} s")
+        times["Odpytanie bazy"] = end - start
     except Exception as e:
         return {
             "success": False,
             "message": f"Błąd podczas odpytania bazy: {str(e)}",
             "params": params,
             "times": times,
-            "types": types_response
+            "types": types_response,
+            "time": sum(times.values())
         }
 
     return {
@@ -508,7 +526,8 @@ def cypher_search(user_query, return_parameters=False):
         "params": params,
         "times": times,
         "types": types_response,
-        "types_query": types_query
+        "types_query": types_query,
+         "time": sum(times.values())
     }
 
 
