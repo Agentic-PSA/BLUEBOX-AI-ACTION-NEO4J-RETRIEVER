@@ -257,7 +257,7 @@ Odpowiedz w formacie json:
     return params
 
 
-def exec_query(params):
+def exec_query(params, return_parameters=False):
     cypher_query = """
 MATCH (product:Product)
 WHERE any(label in $productTypes WHERE label IN labels(product))
@@ -281,8 +281,11 @@ WHERE size([reqProp IN $requiredProperties WHERE
     (reqProp.unit IS NULL OR prop.unit = reqProp.unit)
   ]) > 0
 ]) = size($requiredProperties)
-RETURN product, properties
+RETURN product
 """
+    if return_parameters:
+        cypher_query += ", properties"
+
     with driver.session() as session:
         result = session.run(cypher_query, params)
         records = list(result)
@@ -355,7 +358,7 @@ def check_pn(text):
             return record
     return None
 
-def cypher_search(user_query):
+def cypher_search(user_query, return_parameters=False):
     times = {}
     app = Sanic.get_app()
 
@@ -485,7 +488,7 @@ def cypher_search(user_query):
 
     try:
         start = time.time()
-        results = exec_query(params)
+        results = exec_query(params, return_parameters)
         end = time.time()
         logger.info(f"Krok 4: Odpytanie bazy: {end - start} s")
         times["Krok 4: Odpytanie bazy"] = end - start

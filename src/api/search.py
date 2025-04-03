@@ -14,8 +14,9 @@ class Search(HTTPMethodView):
         if not form.is_valid():
             return JSONResponse(body=form.errors, status=400)
         query = form.cleaned_data['query']
-        response = cypher_search(query)
-        # response = request.app.ctx.NEO4J.get_product(ean)
+        parameters = form.cleaned_data.get('parameters', False)
+        logger.debug(f"parameters: {parameters}")
+        response = cypher_search(query, parameters)
         if not response:
             return JSONResponse(body={"error": "Error"}, status=404)
 

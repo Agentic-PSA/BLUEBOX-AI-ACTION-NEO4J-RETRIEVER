@@ -21,6 +21,7 @@
     <script>
         async function sendSearchRequest() {
             const queryValue = document.getElementById('query').value;
+            const parametersValue = document.getElementById('parameters').checked;
             const resultContainer = document.getElementById('result');
             const loadingIcon = document.getElementById('loading');
             loadingIcon.style.display = 'inline-block';
@@ -31,7 +32,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: queryValue })
+                    body: JSON.stringify({ query: queryValue, parameters: parametersValue })
                 });
                 const result = await response.json();
                 resultContainer.textContent = JSON.stringify(result, null, 2);
@@ -101,8 +102,11 @@
 <body>
     <h1>Search</h1>
     <input type="text" id="query" placeholder="Enter query">
-    <button onclick="sendSearchRequest()" id="button1">Search</button>
+    <input type="checkbox" id="parameters">
+    Pokaż parametry
+    <button onclick="sendSearchRequest()" id="button1" type="submit" >Search</button>
     <div id="loading">⏳ Loading...</div>
+
     <h1>EAN Search</h1>
     <input type="text" id="ean" placeholder="Enter EAN value">
     <button onclick="sendEANSearchRequest()" id="button2">Search</button>
@@ -113,5 +117,14 @@
     <input type="text" id="name" placeholder="Enter Name value">
     <button onclick="sendNameSearchRequest()" id="button4">Search</button>
     <pre id="result"></pre>
+
+    <script>
+        document.getElementById('query').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                document.getElementById('button1').click();
+            }
+        });
+    </script>
 </body>
 </html>
