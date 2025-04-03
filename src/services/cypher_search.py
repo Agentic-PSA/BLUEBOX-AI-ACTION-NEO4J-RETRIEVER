@@ -1,4 +1,3 @@
-from anthropic import Anthropic
 import httpx
 from httpx import Client
 import uuid
@@ -327,9 +326,54 @@ Pytanie użytkownika:
     data = json.loads(response_text)
     return data
 
+def filter_types(user_query, types_response):
+    prompt = f'''
+Określ, których z podanych typów produktów może dotyczyć pytanie użytkownika.
+W odpowiedzi podaj listę type_code.
+Typy:
+{types_response}
+
+Pytanie użytkownika:
+{user_query}
+
+Odpowiedz w formacie json:
+{{"types": ["type_code1", "type_code2"]}}
+    '''
+
+    response_text = llm(prompt)
+    data = json.loads(response_text)
+    return data
+
+def check_ean(text):
+    return 11 <= len(text) <= 13 and text.isdigit()
+
+def check_pn(text):
+    app = Sanic.get_app()
+    response = app.ctx.NEO4J.get_product_by_pn(text)
+    for record in response:
+        if record.get('similarity', 0) >= 0.98:
+            return record
+    return None
+
 def cypher_search(user_query):
     times = {}
     app = Sanic.get_app()
+
+    # Sprawdź EAN
+    if check_ean(user_query):
+        logger.info(f"Szukanie EAN: {user_query}")
+        response = app.ctx.NEO4J.get_product(user_query)
+        if response:
+            return response
+
+    # Sprawdź PN
+    logger.info(f"Szukanie PN: {user_query}")
+    response = check_pn(user_query)
+    logger.info(response)
+    if response:
+        return response
+
+
     try:
         start = time.time()
         data = analize_query(user_query)
@@ -347,10 +391,14 @@ def cypher_search(user_query):
     types_query = user_query
     if "types" in data:
         types = data["types"]
+        if not types:
+            return None
         types_query = types[0]
     elif "name" in data:
         name = data["name"]
         return app.ctx.NEO4J.get_product_by_name(name)
+    else:
+        return None
 
 
     # Krok 1: Wyszukanie typów produktów
@@ -383,6 +431,21 @@ def cypher_search(user_query):
     #         "times": times
     #     }
 
+    #Krok 2: Filtrowanie typów produktów
+    try:
+        start = time.time()
+        data = filter_types(user_query, types_response)
+        types = data.get("types", [])
+        end = time.time()
+        logger.debug(data)
+        logger.info(f"Krok 2: Filtrowanie typów produktów: {end - start} s")
+        times["Krok 2: Filtrowanie typów produktów"] = end - start
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Błąd podczas filtrowania typów: {str(e)}",
+            "times": times
+        }
 
     # Krok 2: Pobierz formatki wybranych typów produktów
     try:
