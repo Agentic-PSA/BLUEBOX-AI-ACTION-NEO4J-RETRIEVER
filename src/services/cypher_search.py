@@ -5,7 +5,7 @@ import time
 import json
 from py2neo import Graph
 import openai
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, Result
 from sanic import Sanic
 from sanic.log import logger
 
@@ -253,7 +253,7 @@ Odpowiedz w formacie json:
     #response_content = response_text.replace('```', '').replace('json', '')
     response_text = llm(prompt)
     params = json.loads(response_text)
-    params["productTypes"] = labels
+    # params["productTypes"] = labels
     return params
 
 
@@ -357,6 +357,68 @@ def check_pn(text):
         if record.get('similarity', 0) >= 0.98:
             return record
     return None
+
+
+def get_params_values(params, types):
+    names = []
+    for property in params.get('requiredProperties', []):
+        if isinstance(property.get('value'), str) or isinstance(property.get('value'), bool):
+            name = property.get('name')
+            names.append(name)
+
+    cypher_query = '''
+MATCH (n)-[:HAS]->(p:Property_PL {name: $name})
+WHERE any(label in labels(n) WHERE label IN $labels)
+RETURN DISTINCT p.value
+'''
+
+    params_values = {}
+    with driver.session() as session:
+        for name in names:
+            name_params = {'name': name, 'labels': types}
+            logger.debug(name_params)
+            result: Result = session.run(cypher_query, name_params)
+            name_values = [v[0] for v in result.values()]
+            logger.debug(name_values)
+            params_values[name] = name_values
+
+    return params_values
+
+
+def correct_generated_params(params, params_values, user_query):
+    prompt = f'''
+    Na podstawie pytania użytkownika została wygenerowana lista parametrów i ich wartości. 
+    Sprawdź czy wszystkie podane wartości są dostępne na liście dopuszczalnych wartości.
+    Popraw wartości, które zostały wypełnione błędnie. 
+    Usuń pola, których wartości nie pasują do żadnej dopuszczalnej wartości.
+    Odpowiedz w formacie JSON takim jak format wejściowy.
+    
+    Dopuszczalne wartości parametrów:
+    {params_values}
+
+    Pytanie użytkownika:
+    {user_query}
+    
+    Lista wygenerowanych parametry:
+    {{'params': {params}}}
+        '''
+
+    response_text = llm(prompt)
+    data = json.loads(response_text)
+    return data.get('params')
+
+
+def get_incorrect_params(params, params_values):
+    properties = params.get('requiredProperties', [])
+    incorrect_params = []
+    for property in properties:
+        if isinstance(property.get('value'), str) or isinstance(property.get('value'), bool):
+            name = property.get('name')
+            value = property.get('value')
+            if value not in params_values.get(name, []):
+                incorrect_params.append(property)
+    return incorrect_params
+
 
 def cypher_search(user_query, return_parameters=False):
     times = {}
@@ -503,7 +565,34 @@ def cypher_search(user_query, return_parameters=False):
             "types": types_response,
             "time": sum(times.values())
         }
+    start = time.time()
+    params_values = get_params_values(params, types)
+    end = time.time()
+    logger.info(f"Znalezienie możliwych wartości parametrów: {end - start} s")
+    times["Znalezienie możliwych wartości parametrów"] = end - start
+    logger.info(params_values)
 
+    if params_values:
+        incorrect_params = get_incorrect_params(params, params_values)
+        logger.info(f"incorrect_params: {incorrect_params}")
+        if incorrect_params:
+            original_params = params
+            start = time.time()
+            corrected_params = correct_generated_params(incorrect_params, params_values, user_query)
+            logger.info(f"corrected_params: {corrected_params}")
+            corrected_params_dict = {}
+            for param in corrected_params:
+                corrected_params_dict[param.get("name")] = param.get("value")
+            for param in params.get('requiredProperties', []):
+                if param.get('name') in corrected_params_dict:
+                    param['value'] = corrected_params_dict[param.get('name')]
+            end = time.time()
+            logger.info(f"Poprawienie parametrów: {end - start} s")
+            times["Poprawienie parametrów"] = end - start
+            logger.info(params)
+
+    #dodanie informacji o typach, które pyta cypher
+    params["productTypes"] = types
 
     try:
         start = time.time()
