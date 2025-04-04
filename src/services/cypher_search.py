@@ -417,9 +417,11 @@ def cypher_search(user_query, return_parameters=False):
         types_query = types[0]
     elif "name" in data:
         name = data["name"]
+        logger.info(f"Wyszukiwanie nazwy: {name}")
         start = time.time()
-        end = time.time()
         name_response = app.ctx.NEO4J.get_product_by_name(name)
+        end = time.time()
+        logger.info(f"Wyszukiwanie nazwy: {end - start} s")
         times["Wyszukiwanie nazwy"] = end - start
         return {
             "success": True,
