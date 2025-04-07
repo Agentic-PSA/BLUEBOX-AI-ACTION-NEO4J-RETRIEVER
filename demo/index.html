@@ -22,6 +22,7 @@
         async function sendSearchRequest() {
             const queryValue = document.getElementById('query').value;
             const parametersValue = document.getElementById('parameters').checked;
+            const aiValue = document.getElementById('ai').checked;
             const resultContainer = document.getElementById('result');
             const loadingIcon = document.getElementById('loading');
             loadingIcon.style.display = 'inline-block';
@@ -32,7 +33,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: queryValue, parameters: parametersValue })
+                    body: JSON.stringify({ query: queryValue, parameters: parametersValue, ai: aiValue })
                 });
                 const result = await response.json();
                 resultContainer.textContent = JSON.stringify(result, null, 2);
@@ -104,6 +105,8 @@
     <input type="text" id="query" placeholder="Enter query">
     <input type="checkbox" id="parameters">
     Pokaż parametry
+    <input type="checkbox" id="ai">
+    AI
     <button onclick="sendSearchRequest()" id="button1" type="submit" >Search</button>
     <div id="loading">⏳ Loading...</div>
     <button id="toggleButton">\/</button>
