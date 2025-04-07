@@ -12,7 +12,7 @@ def find_similar_products(tx, query_vector):
 WITH $query_vector AS queryVector
 MATCH (p:Product)-[:HAS]->(n:Name:Property_PL)
 WITH p, n, gds.similarity.cosine(queryVector, n.embedding) AS similarity
-RETURN n.value AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, similarity
+RETURN n.value AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
 ORDER BY similarity DESC
 LIMIT 10
     """
@@ -25,7 +25,7 @@ def find_similar_pn(tx, query_vector):
     WITH $query_vector AS queryVector
     MATCH (p:Product)
     WITH p, gds.similarity.cosine(queryVector, p.productNumberEmbedding) AS similarity
-    RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, similarity
+    RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
     ORDER BY similarity DESC
     LIMIT 5
     """
@@ -288,7 +288,7 @@ class Neo4jConnector:
                 # query = "MATCH (product:Product {EAN: $ean})-[r:HAS]->(property) " + \
                 #         "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number']) AS product, r, property"
                 query = "MATCH (product:Product {EAN: $ean})" + \
-                        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number']) AS product"
+                        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
                 properties = {"ean": ean_variant}
                 result = session.execute_read(self._execute_query_multiple, query, properties)
                 logger.debug(result)
@@ -296,6 +296,16 @@ class Neo4jConnector:
                     return result[0][0]
         return None
 
+    def get_product_by_action_code(self, action_code: str):
+        with self.get_neo4j_session() as session:
+            query = "MATCH (product:Product {action: $action})" + \
+                    "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
+            properties = {"action": action_code}
+            result = session.execute_read(self._execute_query_multiple, query, properties)
+            logger.debug(result)
+            if result:
+                return result[0][0]
+        return None
 
     def get_product_by_pn(self, pn: str):
         response = self.client_gpt.embeddings.create(

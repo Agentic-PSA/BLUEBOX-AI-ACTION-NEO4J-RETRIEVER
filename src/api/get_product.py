@@ -15,17 +15,19 @@ class GetProduct(HTTPMethodView):
         if ean:
             formatted_response = {"EAN": ean}
             response = request.app.ctx.NEO4J.get_product(ean)
-        else:
+        elif 'pn' in form.cleaned_data:
             pn = form.cleaned_data.get('pn', None)
-            if pn:
-                response = request.app.ctx.NEO4J.get_product_by_pn(pn)
-                if response:
-                    return JSONResponse(body=response)
-            else:
-                name = form.cleaned_data.get('name', None)
-                response = request.app.ctx.NEO4J.get_product_by_name(name)
-                if response:
-                    return JSONResponse(body=response)
+            response = request.app.ctx.NEO4J.get_product_by_pn(pn)
+            if response:
+                return JSONResponse(body=response)
+        elif 'action' in form.cleaned_data:
+            action = form.cleaned_data.get('action', None)
+            response = request.app.ctx.NEO4J.get_product_by_action_code(action)
+        elif 'name' in form.cleaned_data:
+            name = form.cleaned_data.get('name', None)
+            response = request.app.ctx.NEO4J.get_product_by_name(name)
+        if response:
+            return JSONResponse(body=response)
         if not response:
             return JSONResponse(body={"error": "Product not found"}, status=404)
 
