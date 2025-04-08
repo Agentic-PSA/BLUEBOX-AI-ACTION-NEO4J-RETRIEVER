@@ -5,3 +5,4 @@ from .search import Search
 from .add_type import AddType
 from .cypher import Cypher
 from .compatibility import Compatibility
+from .get_products import GetProducts

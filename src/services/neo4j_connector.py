@@ -367,3 +367,17 @@ class Neo4jConnector:
         result = tx.run(query, type1_code=type1_code, type2_code=type2_code,
                         props1=relationship_properties1, props2=relationship_properties2)
         return result.single()
+
+
+    def get_products(self, skip=0, limit=100):
+        query = """MATCH (product:Product)
+                    WITH product, apoc.map.setKey(product, 'action', coalesce(product.action, null)) as productWithAction
+                    RETURN apoc.map.submap(productWithAction, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product
+                    SKIP $skip
+                    LIMIT $limit;"""
+
+        with self.driver.session() as session:
+            result = session.run(query, skip=skip, limit=limit)
+            logger.debug(result)
+            nodes = [record["product"] for record in result]
+            return nodes
