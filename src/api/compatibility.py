@@ -10,6 +10,9 @@ from .forms.compatibility import CompatibilityForm
 class Compatibility(HTTPMethodView):
     @staticmethod
     async def post(request: Request) -> JSONResponse:
+        if "compatibilities" in request.json:
+            return Compatibility.multiple_compatibilities(request)
+
         form = CompatibilityForm(request.json)
         if not form.is_valid():
             return JSONResponse(body=form.errors, status=400)
@@ -43,3 +46,16 @@ class Compatibility(HTTPMethodView):
         body = {'Access-Control-Allow-Methods': 'POST,OPTIONS'}
         headers = {'Access-Control-Allow-Methods': 'POST,OPTIONS'}
         return JSONResponse(body=body, headers=headers)
+
+    @staticmethod
+    def multiple_compatibilities(request):
+        compatibilities = request.json.get("compatibilities")
+        for compatibility in compatibilities:
+            type1 = compatibility.get("type1", '')
+            type2 = compatibility.get("type2", '')
+            type_compatibility = compatibility.get("type_compatibility", "").upper()
+            response = request.app.ctx.NEO4J.add_bidirectional_relationship_with_properties(type1, type2,
+                                                                                            type_compatibility)
+            #logger.info(f"Compatibility response: {response}")
+        return JSONResponse(body={})
+

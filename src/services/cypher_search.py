@@ -517,6 +517,7 @@ def cypher_search(user_query, return_parameters=False):
         start = time.time()
         data = filter_types(user_query, types_response)
         types = data.get("types", [])
+        types = [type_to_label(t) for t in types]
         end = time.time()
         logger.debug(data)
         logger.info(f"Filtrowanie typów produktów: {end - start} s")
@@ -536,8 +537,9 @@ def cypher_search(user_query, return_parameters=False):
         for t in types:
             # print(f"Pobieranie specyfikacji dla typu: {t}")
             specification = src.services.product_specification.get_product_specification(t)
-            specification = src.services.product_specification.filter_language(specification, "PL")
-            specifications[type_to_label(t)] = specification
+            if specification:
+                specification = src.services.product_specification.filter_language(specification, "PL")
+                specifications[type_to_label(t)] = specification
         end = time.time()
         logger.info(f"Pobieranie specyfikacji: {end - start} s")
         times["Pobieranie specyfikacji"] = end - start
@@ -618,7 +620,7 @@ def cypher_search(user_query, return_parameters=False):
         "times": times,
         "types": types_response,
         "types_query": types_query,
-         "time": sum(times.values())
+        "time": sum(times.values())
     }
 
 

@@ -342,7 +342,7 @@ class Neo4jConnector:
 
     def execute_query(self, query, properties={}):
         with self.get_neo4j_session() as session:
-            result = session.execute_read(self._execute_query_records, query, properties)
+            result = session.execute_write(self._execute_query_records, query, properties)
             return result
 
     def add_bidirectional_relationship_with_properties(self, type1_code, type2_code, relationship_type, relationship_properties1={}, relationship_properties2={}):
