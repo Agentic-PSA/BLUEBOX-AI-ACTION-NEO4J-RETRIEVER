@@ -229,7 +229,8 @@ Pola podaj w requiredProperties. Wypełnij tylko te pola, których wartości są
 Ustaw unit na null jeżeli nie jest potrzebne.
 Dostępne jednostki:
 m, in, nm, mm, cm, dm, g, mg, kg, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
-W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: <, >, <=, >.
+W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: <, >, <=, >, <>.
+Znak warunku <> oznacza różny i działa też dla napisów. 
 
 Pytanie użytkownika:
 {question}
@@ -245,6 +246,18 @@ Odpowiedz w formacie json:
       "value": 0,
       "unit": null
       "condition": "="
+    }},
+    {{
+      "name": "",
+      "value": "wartość",
+      "unit": null
+      "condition": "="
+    }},
+    {{
+      "name": "",
+      "value": "wartość",
+      "unit": null
+      "condition": "<>"
     }}
   ]
 }}
@@ -271,12 +284,14 @@ WHERE size([reqProp IN $requiredProperties WHERE
   size([prop IN properties WHERE
     prop.name = reqProp.name AND
     (
+      (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
+      (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
       (reqProp.condition = '<' AND prop.value < reqProp.value) OR
       (reqProp.condition = '>' AND prop.value > reqProp.value) OR
       (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
       (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
-      (apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
-      (prop.value = reqProp.value)
+      ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
+      ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
     ) AND
     (reqProp.unit IS NULL OR prop.unit = reqProp.unit)
   ]) > 0
