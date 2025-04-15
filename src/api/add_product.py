@@ -1,5 +1,5 @@
 import json
-import logging
+from sanic.log import logger
 from sanic.request import Request
 from sanic.views import HTTPMethodView
 from sanic.response import JSONResponse
@@ -24,12 +24,16 @@ class AddProduct(HTTPMethodView):
         main_node_properties = {}
         if 'EAN' in properties:
             main_node_properties['EAN'] = properties['EAN']
+        if 'action' in properties:
+            main_node_properties['action'] = properties.get('action', '')
         if 'common' in properties:
             if isinstance(properties['common'], dict):
                 main_node_properties['name'] = properties['common'].get('Nazwa', '')
                 main_node_properties['product_number'] = properties['common'].get('Product number', '')
                 main_node_properties['producer'] = properties['common'].get('Producent', '')
+
         product_node = request.app.ctx.NEO4J.add_node(labels, main_node_properties)
+        logger.info(product_node)
 
         for language_key, sections in properties.items():
             if not isinstance(sections, list):
@@ -47,6 +51,7 @@ class AddProduct(HTTPMethodView):
                                                                        relationship_properties)
 
                     responses.append(response)
+                    logger.info(response)
 
         return JSONResponse(body=responses)
 

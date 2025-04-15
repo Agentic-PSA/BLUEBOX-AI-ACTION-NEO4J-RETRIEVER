@@ -41,7 +41,7 @@ def find_similar_pn(tx, query_vector):
              "PN": record["PN"], "producer": record["producer"]})
     return formatted_results
 
-def find_similar_type(tx, query_vector, limit=5):
+def find_similar_type(tx, query_vector, limit=20):
     query = f"""
     WITH $query_vector AS queryVector
     MATCH (t:Type)
@@ -118,7 +118,7 @@ class Neo4jConnector:
                 property_node = self._serialize_node(result["n"])
 
                 # Create relationship
-                relationship_query = f"MATCH (a) WHERE id(a) = $product_node_id MATCH (b) WHERE id(b) = $property_node_id "
+                relationship_query = f"MATCH (a) WHERE elementId(a) = $product_node_id MATCH (b) WHERE elementId(b) = $property_node_id "
                 relationship_query += f"CREATE (a)-[r:HAS {{"
                 if relationship_properties:
                     relationship_query += ", ".join(
@@ -127,8 +127,8 @@ class Neo4jConnector:
                 logger.info(relationship_query)
 
                 parameters = {
-                    "property_node_id": int(property_node["element_id"]),
-                    "product_node_id": int(product_node["element_id"])
+                    "property_node_id": property_node["element_id"],
+                    "product_node_id": product_node["element_id"]
                 }
                 if relationship_properties:
                     parameters.update(relationship_properties)
@@ -200,7 +200,7 @@ class Neo4jConnector:
                     property_node = self._serialize_node(result["n"])
                     logger.info(property_node)
                     # Create relationship
-                    relationship_query = f"MATCH (a) WHERE id(a) = $product_node_id MATCH (b) WHERE id(b) = $property_node_id "
+                    relationship_query = f"MATCH (a) WHERE elementId(a) = $product_node_id MATCH (b) WHERE elementId(b) = $property_node_id "
                     relationship_query += f"CREATE (a)-[r:HAS {{"
                     if relationship_properties:
                         relationship_query += ", ".join(
@@ -209,8 +209,8 @@ class Neo4jConnector:
                     logger.info(relationship_query)
 
                     parameters = {
-                        "property_node_id": int(property_node["element_id"]),
-                        "product_node_id": int(product_node["element_id"])
+                        "property_node_id": property_node["element_id"],
+                        "product_node_id": product_node["element_id"]
                     }
                     property_nodes_ids.append(property_node["element_id"])
                     if relationship_properties:
@@ -224,14 +224,14 @@ class Neo4jConnector:
 
                 for i in range(len(property_nodes_ids)):
                     for j in range(i+1, len(property_nodes_ids)):
-                        query = "MATCH (a) WHERE id(a) = $property_node_id1 " + \
-                                "MATCH (b) WHERE id(b) = $property_node_id2 " + \
+                        query = "MATCH (a) WHERE elementId(a) = $property_node_id1 " + \
+                                "MATCH (b) WHERE elementId(b) = $property_node_id2 " + \
                                 "MERGE (a)-[r:IS_EQUAL]-(b) " + \
                                 "RETURN r"
                         logger.info(query)
                         parameters = {
-                            "property_node_id1": int(property_nodes_ids[i]),
-                            "property_node_id2": int(property_nodes_ids[j])
+                            "property_node_id1": property_nodes_ids[i],
+                            "property_node_id2": property_nodes_ids[j]
                         }
                         session.execute_write(self._execute_query, query, parameters)
 
