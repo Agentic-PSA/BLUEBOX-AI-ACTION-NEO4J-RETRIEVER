@@ -6,6 +6,8 @@ from sanic.response import JSONResponse
 from .forms.search import SearchForm
 
 from src.services.cypher_search import cypher_search
+from src.services.ai_search import ai_search
+
 
 class Search(HTTPMethodView):
     @staticmethod
@@ -16,7 +18,11 @@ class Search(HTTPMethodView):
         query = form.cleaned_data['query']
         parameters = form.cleaned_data.get('parameters', False)
         logger.debug(f"parameters: {parameters}")
-        response = cypher_search(query, parameters)
+        ai_answer = form.cleaned_data.get('ai', False)
+        if ai_answer:
+            response = ai_search(query, parameters)
+        else:
+            response = cypher_search(query, parameters)
         if not response:
             return JSONResponse(body={"error": "Error"}, status=404)
 

@@ -373,6 +373,11 @@ def check_pn(text):
             return record
     return None
 
+def check_action(text):
+    app = Sanic.get_app()
+    response = app.ctx.NEO4J.get_product_by_action_code(text)
+    return response
+
 
 def get_params_values(params, types):
     names = []
@@ -435,7 +440,30 @@ def get_incorrect_params(params, params_values):
     return incorrect_params
 
 
-def cypher_search(user_query, return_parameters=False):
+def get_ai_answer(user_query, results):
+    prompt = f'''
+Jesteś chatbotem obsługi klienta w sklepie z elektroniką. Twoim zadaniem jest analizowanie zapytań klientów i odpowiadanie na nie w optymalny sposób, tak aby pomóc im w doborze odpowiedniego sprzętu. 
+Odpowiedz na pytanie użytkownika na podstawie dostarczonych danych.
+
+Pytanie użytkownika:
+{user_query}
+
+Dane:
+{results}
+
+Odpowiedz w formacie JSON:
+{{"answer": ""}}
+'''
+
+    response_text = llm(prompt)
+    data = json.loads(response_text)
+    return data.get('answer')
+
+
+
+
+
+def cypher_search(user_query, return_parameters=False, ai_answer=False):
     times = {}
     app = Sanic.get_app()
 
@@ -450,7 +478,23 @@ def cypher_search(user_query, return_parameters=False):
     if ean_response:
         return {
             "success": True,
+            "search_type": "EAN",
             "results": ean_response,
+            "times": times,
+            "time": sum(times.values())
+        }
+
+
+    # Sprawdź Action code
+    start = time.time()
+    action_response = check_action(user_query)
+    end = time.time()
+    times["Wyszukiwanie Action"] = end - start
+    if action_response:
+        return {
+            "success": True,
+            "search_type": "action",
+            "results": action_response,
             "times": times,
             "time": sum(times.values())
         }
@@ -466,6 +510,7 @@ def cypher_search(user_query, return_parameters=False):
     if pn_response:
         return {
             "success": True,
+            "search_type": "pn",
             "results": pn_response,
             "times": times,
             "time": sum(times.values())
@@ -500,8 +545,19 @@ def cypher_search(user_query, return_parameters=False):
         end = time.time()
         logger.info(f"Wyszukiwanie nazwy: {end - start} s")
         times["Wyszukiwanie nazwy"] = end - start
+
+        answer = None
+        if ai_answer:
+            start = time.time()
+            answer = get_ai_answer(user_query, name_response)
+            end = time.time()
+            logger.info(f"Odpowiedź AI: {end - start} s")
+            times["Odpowiedź AI"] = end - start
+
         return {
             "success": True,
+            "search_type": "name",
+            "message": answer if answer else "",
             "results": name_response,
             "times": times,
             "time": sum(times.values())
@@ -627,9 +683,18 @@ def cypher_search(user_query, return_parameters=False):
             "time": sum(times.values())
         }
 
+    answer = None
+    if ai_answer:
+        start = time.time()
+        answer = get_ai_answer(user_query, results)
+        end = time.time()
+        logger.info(f"Odpowiedź AI: {end - start} s")
+        times["Odpowiedź AI"] = end - start
+
     return {
         "success": True,
-        "message": f"",
+        "search_type": "parameters",
+        "message": answer if answer else "",
         "results": results,
         "params": params,
         "times": times,
