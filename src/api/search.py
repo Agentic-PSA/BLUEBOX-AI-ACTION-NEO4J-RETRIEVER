@@ -28,3 +28,9 @@ class Search(HTTPMethodView):
 
 
         return JSONResponse(body=response)
+
+    @staticmethod
+    async def options(self, request: Request, *args, **kwargs) -> JSONResponse:
+        body = {'Access-Control-Allow-Methods': 'POST,OPTIONS'}
+        headers = {'Access-Control-Allow-Methods': 'POST,OPTIONS'}
+        return JSONResponse(body=body, headers=headers)

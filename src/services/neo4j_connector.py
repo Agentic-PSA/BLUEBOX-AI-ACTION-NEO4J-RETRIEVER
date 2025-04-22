@@ -9,12 +9,8 @@ from ..utils import UnitConverter
 
 def find_similar_products(tx, query_vector):
     query = """
-WITH $query_vector AS queryVector
-MATCH (p:Product)-[:HAS]->(n:Name:Property_PL)
-WITH p, n, gds.similarity.cosine(queryVector, n.embedding) AS similarity
-RETURN n.value AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
-ORDER BY similarity DESC
-LIMIT 10
+    CALL db.index.vector.queryNodes('name', 10, $query_vector) yield node as p, score AS similarity
+    RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
     """
     result = tx.run(query, query_vector=query_vector)
     return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
@@ -22,20 +18,17 @@ LIMIT 10
 
 def find_similar_pn(tx, query_vector):
     query = """
-    WITH $query_vector AS queryVector
-    MATCH (p:Product)
-    WITH p, gds.similarity.cosine(queryVector, p.productNumberEmbedding) AS similarity
+    CALL db.index.vector.queryNodes('product_number', 5, $query_vector) yield node as p, score AS similarity
     RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
-    ORDER BY similarity DESC
-    LIMIT 5
     """
+
     similarity_100 = False
     result = tx.run(query, query_vector=query_vector)
     formatted_results = []
     for record in result:
-        if record["similarity"] >= 1.0:
+        if record["similarity"] >= 0.999:
             similarity_100 = True
-        if similarity_100 and record["similarity"] < 1.0:
+        if similarity_100 and record["similarity"] < 0.999:
             break
         formatted_results.append({"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
              "PN": record["PN"], "producer": record["producer"]})
