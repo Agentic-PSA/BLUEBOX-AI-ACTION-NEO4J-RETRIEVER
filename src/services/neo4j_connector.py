@@ -361,6 +361,56 @@ class Neo4jConnector:
                         props1=relationship_properties1, props2=relationship_properties2)
         return result.single()
 
+    def add_properties_to_bidirectional_relationship(self, type1_code, type2_code, relationship_properties1={}, relationship_properties2={}):
+        with self.driver.session() as session:
+            result = session.write_transaction(
+                self._create_properties_to_bidirectional_relationship,
+                type1_code, type2_code, relationship_properties1, relationship_properties2
+            )
+            return result
+
+    @staticmethod
+    def _create_properties_to_bidirectional_relationship(tx, type1_code, type2_code,
+                                                           relationship_properties1, relationship_properties2):
+        logger.info(relationship_properties1)
+        logger.info(type(relationship_properties1))
+        logger.info(relationship_properties2)
+        logger.info(type(relationship_properties2))
+        query = (
+            """MATCH (a {code: $type1_code}), (b {code: $type2_code})
+                MERGE (a)-[r1:TYPES_COMPATIBLE]->(b)
+                SET r1 += $props1
+                MERGE (b)-[r2:TYPES_COMPATIBLE]->(a)
+                SET r2 += $props2
+                RETURN r1, r2"""
+        )
+        result = tx.run(query, type1_code=type1_code, type2_code=type2_code,
+                        props1=relationship_properties1, props2=relationship_properties2)
+        return result.single()
+
+    def add_products_bidirectional_relationship_with_properties(self, ean1, ean2, relationship_type, relationship_properties1={}, relationship_properties2={}):
+        with self.driver.session() as session:
+            result = session.write_transaction(
+                self._create_products_bidirectional_relationship_with_properties,
+                ean1, ean2, relationship_type, relationship_properties1, relationship_properties2
+            )
+            return result
+
+    @staticmethod
+    def _create_products_bidirectional_relationship_with_properties(tx, ean1, ean2, relationship_type,
+                                                           relationship_properties1, relationship_properties2):
+        query = (
+            "MATCH (a:Product {EAN: $ean1}), (b:Product {EAN: $ean2}) "
+            f"MERGE (a)-[r1:{relationship_type}]->(b) "
+            "ON CREATE SET r1 += $props1 "
+            f"MERGE (b)-[r2:{relationship_type}]->(a) "
+            "ON CREATE SET r2 += $props2 "
+            "RETURN a, b, r1, r2"
+        )
+        result = tx.run(query, ean1=ean1, ean2=ean2,
+                        props1=relationship_properties1, props2=relationship_properties2)
+        return result.single()
+
 
     def get_products(self, skip=0, limit=100):
         query = """MATCH (product:Product)

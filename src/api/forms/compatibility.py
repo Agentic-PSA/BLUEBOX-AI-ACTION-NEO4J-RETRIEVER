@@ -11,15 +11,19 @@ class CompatibilityForm:
         type1: str = self.raw_data.get('type1', '')
         type2: str = self.raw_data.get('type2','')
         type_compatibility:str = self.raw_data.get('type_compatibility','')
+        product_compatibility:str = self.raw_data.get('product_compatibility','')
+        attributes_compatibility:str = self.raw_data.get('attributes_compatibility','')
 
-        if not type1:
-            self.errors.append({'type1': 'type1 is missing'})
-        if not type2:
-            self.errors.append({'type2': 'type2 is missing'})
-        if not type_compatibility:
+        if not type_compatibility and not product_compatibility and not attributes_compatibility:
             self.errors.append({'type_compatibility': 'type_compatibility is missing'})
-        elif not isinstance(type_compatibility, str):
-            self.errors.append({'type_compatibility': 'type_compatibility is incorrect'})
+
+        # if not type1:
+        #     self.errors.append({'type1': 'type1 is missing'})
+        # if not type2:
+        #     self.errors.append({'type2': 'type2 is missing'})
+
+        # elif not isinstance(type_compatibility, str):
+        #     self.errors.append({'type_compatibility': 'type_compatibility is incorrect'})
 
         # if type_compatibility == "compatible":
         #     type1_parameters: list  = self.raw_data.get('type1_parameters', [])
