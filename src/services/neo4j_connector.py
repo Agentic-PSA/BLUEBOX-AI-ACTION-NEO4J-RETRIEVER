@@ -424,3 +424,32 @@ class Neo4jConnector:
             logger.debug(result)
             nodes = [record["product"] for record in result]
             return nodes
+
+
+    def get_products_with_parameters(self, skip=0, limit=100, type=None):
+        label = type if type else "Product"
+        query = f"""
+        MATCH (prod:{label})
+        OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+        WITH prod, 
+            collect({{
+              name: prop.name,
+              value: prop.value,
+              unit: prop.unit
+            }}) as properties
+        RETURN {{
+          EAN: prod.EAN,
+          name: prod.name,
+          producer: prod.producer,
+          action: prod.action,
+          product_number: prod.product_number,
+          properties: properties
+        }} as product
+        SKIP $skip
+        LIMIT $limit
+        """
+
+        with self.driver.session() as session:
+            result = session.run(query, skip=skip, limit=limit)
+            nodes = [record["product"] for record in result]
+            return nodes

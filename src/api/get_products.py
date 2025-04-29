@@ -8,7 +8,15 @@ class GetProducts(HTTPMethodView):
     async def post(request: Request) -> JSONResponse:
         skip = request.json.get("skip", 0)
         limit = request.json.get("limit", 100)
-        response = request.app.ctx.NEO4J.get_products(skip, limit)
+        type = request.json.get("type", None)
+        if type:
+            type = type.replace("-", "_")
+        parameters = request.json.get("parameters", False)
+
+        if parameters:
+            response = request.app.ctx.NEO4J.get_products_with_parameters(skip, limit, type)
+        else:
+            response = request.app.ctx.NEO4J.get_products(skip, limit)
         return JSONResponse(response)
 
     @staticmethod
