@@ -14,7 +14,7 @@ def find_similar_products(tx, query_vector):
     """
     result = tx.run(query, query_vector=query_vector)
     return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
-             "PN": record["PN"], "producer": record["producer"]} for record in result]
+             "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
 
 def find_similar_pn(tx, query_vector):
     query = """
@@ -31,7 +31,7 @@ def find_similar_pn(tx, query_vector):
         if similarity_100 and record["similarity"] < 0.999:
             break
         formatted_results.append({"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
-             "PN": record["PN"], "producer": record["producer"]})
+             "PN": record["PN"], "action": record["action"], "producer": record["producer"]})
     return formatted_results
 
 def find_similar_type(tx, query_vector, limit=20):

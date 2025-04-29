@@ -2,6 +2,7 @@ from .add_node import AddNode
 from .add_product import AddProduct
 from .get_product import GetProduct
 from .search import Search
+from .simple_search import SimpleSearch
 from .add_type import AddType
 from .cypher import Cypher
 from .compatibility import Compatibility

@@ -19,6 +19,29 @@
         }
     </style>
     <script>
+        async function sendSimpleSearchRequest() {
+            const queryValue = document.getElementById('query').value;
+            const resultContainer = document.getElementById('result');
+            const loadingIcon = document.getElementById('loading');
+            loadingIcon.style.display = 'inline-block';
+            resultContainer.textContent = '';
+            try {
+                const response = await fetch('http://172.19.3.220:5013/simple_search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: queryValue})
+                });
+                const result = await response.json();
+                resultContainer.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                resultContainer.textContent = 'Error: ' + error.message;
+            }
+            finally {
+                loadingIcon.style.display = 'none';
+            }
+        }
         async function sendSearchRequest() {
             const queryValue = document.getElementById('query').value;
             const parametersValue = document.getElementById('parameters').checked;
@@ -108,6 +131,7 @@
     <input type="checkbox" id="ai">
     AI
     <button onclick="sendSearchRequest()" id="button1" type="submit" >Search</button>
+    <button onclick="sendSimpleSearchRequest()" id="button_simple" type="submit" >Simple Search</button>
     <div id="loading">⏳ Loading...</div>
     <button id="toggleButton">\/</button>
     <div id="advanced" style="display: none;">

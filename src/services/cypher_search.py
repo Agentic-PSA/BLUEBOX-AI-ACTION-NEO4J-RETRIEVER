@@ -708,6 +708,83 @@ def type_to_label(t: str):
     return t.replace("-", "_")
 
 
+
+def simple_search(user_query):
+    times = {}
+    app = Sanic.get_app()
+
+    # Sprawdź EAN
+    ean_response = None
+    start = time.time()
+    if check_ean(user_query):
+        logger.info(f"Szukanie EAN: {user_query}")
+        ean_response = app.ctx.NEO4J.get_product(user_query)
+    end = time.time()
+    times["Wyszukiwanie EAN"] = end - start
+    if ean_response:
+        return {
+            "success": True,
+            "search_type": "EAN",
+            "results": ean_response,
+            "times": times,
+            "time": sum(times.values())
+        }
+
+
+    # Sprawdź Action code
+    start = time.time()
+    action_response = check_action(user_query)
+    end = time.time()
+    times["Wyszukiwanie Action"] = end - start
+    if action_response:
+        return {
+            "success": True,
+            "search_type": "action",
+            "results": action_response,
+            "times": times,
+            "time": sum(times.values())
+        }
+
+    start = time.time()
+    # Sprawdź PN
+    logger.info(f"Szukanie PN: {user_query}")
+    pn_response = check_pn(user_query)
+
+    end = time.time()
+    times["Wyszukiwanie PN"] = end - start
+    logger.info(pn_response)
+    if pn_response:
+        return {
+            "success": True,
+            "search_type": "pn",
+            "results": pn_response,
+            "times": times,
+            "time": sum(times.values())
+        }
+
+    start = time.time()
+    # Szukaj nazwy
+    logger.info(f"Szukaj nazwy: {user_query}")
+    name_response = app.ctx.NEO4J.get_product_by_name(user_query)
+
+    end = time.time()
+    times["Wyszukiwanie nazwy"] = end - start
+    logger.info(name_response)
+    if name_response:
+        return {
+            "success": True,
+            "search_type": "name",
+            "results": name_response,
+            "times": times,
+            "time": sum(times.values())
+        }
+
+    return {
+        "success": False,
+        "times": times,
+        "time": sum(times.values())
+    }
+
 if __name__ == "__main__":
 
     # client = openai.OpenAI(
