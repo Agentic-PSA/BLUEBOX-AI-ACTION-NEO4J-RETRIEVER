@@ -289,6 +289,44 @@ class Neo4jConnector:
                     return result[0][0]
         return None
 
+    def get_product_with_parameters(self, ean: str):
+        variants = self.generate_ean_variants(ean)
+        ean_in_db = None
+        with self.get_neo4j_session() as session:
+            for ean_variant in variants:
+                query = "MATCH (product:Product {EAN: $ean})" + \
+                        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
+                properties = {"ean": ean_variant}
+                result = session.execute_read(self._execute_query_multiple, query, properties)
+                logger.debug(result)
+                if result:
+                    ean_in_db = ean_variant
+                    break
+            if not ean_in_db:
+                return None
+
+            query = """
+                    MATCH (prod:Product{EAN: $ean})
+                    OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+                    WITH prod, 
+                        collect({
+                          name: prop.name,
+                          value: prop.value,
+                          unit: prop.unit
+                        }) as properties
+                    RETURN {
+                      EAN: prod.EAN,
+                      name: prod.name,
+                      producer: prod.producer,
+                      action: prod.action,
+                      product_number: prod.product_number,
+                      properties: properties
+                    } as product
+                    """
+            properties = {"ean": ean_in_db}
+            result = session.execute_read(self._execute_query, query, properties)
+            return result
+
     def get_product_by_action_code(self, action_code: str):
         with self.get_neo4j_session() as session:
             query = "MATCH (product:Product {action: $action})" + \

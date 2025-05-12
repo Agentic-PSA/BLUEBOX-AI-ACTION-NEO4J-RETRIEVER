@@ -42,8 +42,17 @@ class Compatibility(HTTPMethodView):
             attributes_compatibility = form.cleaned_data.get("attributes_compatibility")
             type1 = form.cleaned_data.get("type1", '')
             type2 = form.cleaned_data.get("type2", '')
+
             type1_parameters = form.cleaned_data.get("type1_parameters", {})
+            if type1_parameters:
+                type1_parameters = {"properties": type1_parameters}
+            else:
+                type1_parameters = {}
             type2_parameters = form.cleaned_data.get("type2_parameters", {})
+            if type2_parameters:
+                type2_parameters = {"properties": type2_parameters}
+            else:
+                type2_parameters = {}
 
 
             request.app.ctx.NEO4J.add_properties_to_bidirectional_relationship(type1, type2, type1_parameters, type2_parameters)

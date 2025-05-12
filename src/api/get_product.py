@@ -12,9 +12,13 @@ class GetProduct(HTTPMethodView):
         if not form.is_valid():
             return JSONResponse(body=form.errors, status=400)
         ean = form.cleaned_data.get('ean', None)
+        parameters = form.cleaned_data.get('parameters', False)
         if ean:
             formatted_response = {"EAN": ean}
-            response = request.app.ctx.NEO4J.get_product(ean)
+            if parameters:
+                response = request.app.ctx.NEO4J.get_product_with_parameters(ean)
+            else:
+                response = request.app.ctx.NEO4J.get_product(ean)
         elif 'pn' in form.cleaned_data:
             pn = form.cleaned_data.get('pn', None)
             response = request.app.ctx.NEO4J.get_product_by_pn(pn)
