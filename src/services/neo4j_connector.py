@@ -295,7 +295,7 @@ class Neo4jConnector:
         with self.get_neo4j_session() as session:
             for ean_variant in variants:
                 query = "MATCH (product:Product {EAN: $ean})" + \
-                        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
+                        "RETURN apoc.map.clean(product, ['EAN', 'name', 'producer', 'product_number', 'action'], []) AS product;"
                 properties = {"ean": ean_variant}
                 result = session.execute_read(self._execute_query_multiple, query, properties)
                 logger.debug(result)
