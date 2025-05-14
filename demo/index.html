@@ -20,7 +20,7 @@
     </style>
     <script>
         async function sendSimpleSearchRequest() {
-            const queryValue = document.getElementById('query').value;
+            const queryValue = document.getElementById('simple_search_query').value;
             const resultContainer = document.getElementById('result');
             const loadingIcon = document.getElementById('loading');
             loadingIcon.style.display = 'inline-block';
@@ -124,14 +124,17 @@
     </script>
 </head>
 <body>
-    <h1>Search</h1>
-    <input type="text" id="query" placeholder="Enter query">
+    <h1>Simple Search</h1>
+    <input type="text" id="simple_search_query" placeholder="Enter query">
+    <button onclick="sendSimpleSearchRequest()" id="button_simple" type="submit" >Simple Search</button>
+    <h1>Semantic Search</h1>
+    <textarea id="query" placeholder="Enter query" rows="2" style="resize: both;"></textarea>
     <input type="checkbox" id="parameters">
     Pokaż parametry
     <input type="checkbox" id="ai">
     AI
     <button onclick="sendSearchRequest()" id="button1" type="submit" >Search</button>
-    <button onclick="sendSimpleSearchRequest()" id="button_simple" type="submit" >Simple Search</button>
+
     <div id="loading">⏳ Loading...</div>
     <button id="toggleButton">\/</button>
     <div id="advanced" style="display: none;">
