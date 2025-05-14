@@ -13,8 +13,9 @@ class CompatibilityForm:
         type_compatibility:str = self.raw_data.get('type_compatibility','')
         product_compatibility:str = self.raw_data.get('product_compatibility','')
         attributes_compatibility:str = self.raw_data.get('attributes_compatibility','')
+        type_compatibility_importance:str = self.raw_data.get('type_compatibility_importance', '')
 
-        if not type_compatibility and not product_compatibility and not attributes_compatibility:
+        if not any([type_compatibility, product_compatibility, attributes_compatibility, type_compatibility_importance]):
             self.errors.append({'type_compatibility': 'type_compatibility is missing'})
 
         # if not type1:

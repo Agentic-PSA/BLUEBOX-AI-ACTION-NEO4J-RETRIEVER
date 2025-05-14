@@ -229,7 +229,7 @@ Dostępne jednostki:
 m, in, nm, mm, cm, dm, g, mg, kg, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
 W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: <, >, <=, >, <>.
 Znak warunku <> oznacza różny i działa też dla napisów. 
-
+Jeżeli użytkownik podał kilka możliwych wartości parametrów podaj je jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
 Pytanie użytkownika:
 {question}
 
@@ -256,6 +256,12 @@ Odpowiedz w formacie json:
       "value": "wartość",
       "unit": null
       "condition": "<>"
+    }},
+    {{
+      "name": "",
+      "value": ["wartość 1", "wartość 2", "wartość 3"],
+      "unit": null
+      "condition": "="
     }}
   ]
 }}
@@ -282,6 +288,7 @@ WHERE size([reqProp IN $requiredProperties WHERE
   size([prop IN properties WHERE
     prop.name = reqProp.name AND
     (
+      (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toLower(toString(prop.value)) IN reqProp.value) OR
       (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
       (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
       (reqProp.condition = '<' AND prop.value < reqProp.value) OR

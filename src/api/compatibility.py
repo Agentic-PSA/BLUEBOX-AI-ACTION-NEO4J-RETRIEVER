@@ -38,6 +38,13 @@ class Compatibility(HTTPMethodView):
             logger.info(f"Compatibility response: {response}")
 
             return JSONResponse(body={})
+        elif form.cleaned_data.get("type_compatibility_importance"):
+            type1 = form.cleaned_data.get("type1", '')
+            type2 = form.cleaned_data.get("type2", '')
+            type_compatibility_importance = form.cleaned_data.get("type_compatibility_importance")
+            parameters = {"importance": type_compatibility_importance}
+            result = request.app.ctx.NEO4J.add_properties_to_bidirectional_relationship(type1, type2, parameters, parameters)
+            return JSONResponse(body={})
         elif form.cleaned_data.get("attributes_compatibility"):
             attributes_compatibility = form.cleaned_data.get("attributes_compatibility")
             type1 = form.cleaned_data.get("type1", '')
