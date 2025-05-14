@@ -323,19 +323,24 @@ def get_embedding(text, model="text-embedding-3-small"):
 
 def analize_query(user_query):
     prompt = f'''
-Użytkownik może szukać produktów podając jego parametry lub szukać konkretnego produktu podając nazwę.
+Użytkownik może szukać produktów podając jego parametry lub szukać jednego lub kilku konkretnych produktów podając nazwy, numery EAN lub Part number.
 Określ jakich typów produktów może dotyczyć pytanie lub jeżeli pytanie dotyczy konkretnego produktu o podanej nazwie podaj jego nazwę.
 Odpowiedz w formacie json:
 {{"types": ["lodówki", "tablety"]}}
 lub
 {{"name": "Nazwa produktu"}}
+lub jeżeli użytkownik podał kilka produktów:
+{{"products": [{{"name": "Nazwa produktu X"}}, {{"EAN": "EAN produktu Y"}}, {{"PN": "Part number produktu Z"}}, ...] }}
 
 Przykłady:
 Pytanie: Telefon z systemem iOS
 Odpowiedź: {{"types": ["telefony komórkowe"]}}
 Pytanie: biały iPhone 13
 Odpowiedź: {{"name": "iPhone 13"}}
-
+Pytanie: iPhone 15, Samsung S24, Xiaomi 15
+Odpowiedź: {{"products": [{{"name": "iPhone 15"}}, {{"name": "Samsung S24"}}, {{"name": "Xiaomi 15"}}] }}
+Pytanie: 1234567890123, 0987654321098
+Odpowiedź: {{"products": [{{"EAN": "1234567890123"}}, {{"EAN": "0987654321098"}}] }}
 
 Pytanie użytkownika:
 {user_query}
@@ -513,8 +518,50 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             "times": times,
             "time": sum(times.values())
         }
+    elif "products" in data:
+        products = data["products"]
+        logger.info(f"Wyszukiwanie produktów: {products}")
+        names = []
+        eans = []
+        pns = []
+        for product in products:
+            if "name" in product:
+                names.append(product["name"])
+            if "EAN" in product:
+                eans.append(product["EAN"])
+            if "PN" in product:
+                pns.append(product["PN"])
+        start = time.time()
+        responses = []
+        for name in names:
+            response = app.ctx.NEO4J.get_product_by_name(name, 1, 0.8)
+            if response:
+                responses.append(response[0])
+        for ean in eans:
+            ean_response = app.ctx.NEO4J.get_product(ean)
+            responses.append(ean_response)
+        for pn in pns:
+            pn_response = app.ctx.NEO4J.get_product_by_pn(pn)
+            if pn_response:
+                responses.append(pn_response[0])
+        end = time.time()
+        logger.info(f"Wyszukiwanie produktów: {end - start} s")
+        times["Wyszukiwanie produktów"] = end - start
+
+        return {
+            "success": True,
+            "search_type": "products",
+            "results": responses,
+            "times": times,
+            "time": sum(times.values())
+        }
     else:
-        return None
+        return {
+            "success": False,
+            "message": f"Błąd podczas analizy pytania",
+            "times": times,
+            "time": sum(times.values())
+        }
 
 
     # Krok 1: Wyszukanie typów produktów
