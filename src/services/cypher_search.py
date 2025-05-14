@@ -36,7 +36,7 @@ def llm(prompt):
     print(response_text)
     return response_text
 
-def search_search_group(descriptions=[]):
+def search_group(descriptions=[]):
     client = Client(verify=False)
 
     token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwibmFtZSI6Im1idGVzdCIsInNoYXJlcG9pbnRfZW1haWwiOiJ4QHgucGwifQ.MIqGiWA2uYuW6YYZ_1movoX-92KcPdRTkVLcjINFX5M'
@@ -57,14 +57,12 @@ def search_search_group(descriptions=[]):
 
     print(response.json())
 
-    groups = []
+    results = []
     for item in response.json():
-        results = item.get('results', [])
-        for r in results:
-            group = r.get('group', "")
-            groups.append(group)
-
-    return groups
+        item_results = item.get('results', [])
+        if item_results and isinstance(item_results, list):
+            results.append(item_results[0])
+    return results
 
 
 def generate_simple_cypher_query_with_llm(schema_text, relationships, user_query, specifications):
@@ -465,9 +463,6 @@ Odpowiedz w formacie JSON:
     return data.get('answer')
 
 
-
-
-
 def cypher_search(user_query, return_parameters=False, ai_answer=False):
     times = {}
     app = Sanic.get_app()
@@ -533,10 +528,13 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 pns.append(product["PN"])
         start = time.time()
         responses = []
+        alternative_search = []
         for name in names:
-            response = app.ctx.NEO4J.get_product_by_name(name, 1, 0.8)
+            response = app.ctx.NEO4J.get_product_by_name(name, 1,  0.8)
             if response:
                 responses.append(response[0])
+            else:
+                alternative_search.append(name)
         for ean in eans:
             ean_response = app.ctx.NEO4J.get_product(ean)
             responses.append(ean_response)
@@ -547,6 +545,13 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         end = time.time()
         logger.info(f"Wyszukiwanie produktów: {end - start} s")
         times["Wyszukiwanie produktów"] = end - start
+
+        if alternative_search:
+            start = time.time()
+            responses += search_group(alternative_search)
+            end = time.time()
+            logger.info(f"Alternatywne szukanie produktów: {end - start} s")
+            times["Alternatywne szukanie produktów"] = end - start
 
         return {
             "success": True,
