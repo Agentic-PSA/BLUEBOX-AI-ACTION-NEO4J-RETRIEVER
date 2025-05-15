@@ -119,11 +119,64 @@ Pytanie użytkownika:
 
     return llm(prompt)
 
+def prompt2(query):
+    prompt = """
+ZADANIE:
+Działasz jako specjalista ds. sprzętu IT. Twoim zadaniem jest zwrócić jeden wspólny obiekt JSON zawierający propozycje produktów dopasowanych do zapytania użytkownika – z uwzględnieniem znanych modeli handlowych.
+
+ZASADY:
+Zawsze zwracaj jeden obiekt JSON w poniższej strukturze:
+
+{
+  "nazwa_semantyczna": string,
+  "products": [
+    {
+      "model": string | null,
+      "part_number": string | null,
+      "ean": string | null
+    },
+    {
+      "model": string | null,
+      "part_number": string | null,
+      "ean": string | null
+    },
+    ...
+  ]
+}
+
+LOGIKA:
+
+1. Jeśli zapytanie zawiera 5 lub więcej istotnych parametrów technicznych, np. CPU, RAM, typ GPU, standard portów, dokładne wymagania SIWZ:
+   - dobierz 2–3 konkretne modele handlowe, które spełniają wymagania (wraz z part number i EAN, jeśli znane),
+   - nazwa_semantyczna = "ai_search [typ produktu] [parametry techniczne wynikające z nazw modeli]",
+   - dodaj także wszystkie parametry ze specyfikacji klienta, jeśli nie pojawiły się w nazwie modelu – poza tymi, które są zbyt oczywiste dla danej kategorii,
+   - bardzo specyficzne cechy oznaczaj flagą (!).
+
+2. Jeśli zapytanie zawiera tylko ogólną specyfikację (np. "monitor 24 cale 120Hz"):
+   - pozostaw modele i kody jako null,
+   - nazwa_semantyczna zgodnie z dotychczasowym schematem.
+
+3. Jeśli zapytanie dotyczy aspektów nieproduktowych (np. tylko kod EAN, certyfikat, zgodność, producent):
+   - odpowiedź: null
+
+DODATKOWE UWAGI:
+- nazwa_semantyczna zawsze zaczyna się od prefiksu: "ai_search"
+- nazwa_semantyczna nie może zawierać nazw producentów, numerów katalogowych, kodów EAN
+- Nie dodawaj żadnego komentarza – zwracaj wyłącznie czysty JSON
+- Wartości tekstowe w nazwa_semantyczna muszą odzwierciedlać realne dane z nazw modeli
+- Nie uwzględniaj informacji o gwarancji w nazwie semantycznej
+
+Pytanie użytkownika:
+"""
+
+    prompt+= query
+
+    return llm(prompt)
 
 def ai_search(query, properties=False):
     app = Sanic.get_app()
     start = time.time()
-    answer = prompt1(query)
+    answer = prompt2(query)
     end = time.time()
     logger.info(answer)
 
@@ -131,18 +184,26 @@ def ai_search(query, properties=False):
     json_answer["time"] = end-start
 
 
-    if json_answer.get("query_type", "").lower() == "product":
-        products = json_answer.get("products", [])
+    # if json_answer.get("query_type", "").lower() == "product":
+    #     products = json_answer.get("products", [])
+    #
+    #     products_responses = []
+    #     for product in products:
+    #         name = product.get("name", "")
+    #         if name:
+    #             start = time.time()
+    #             name_response = app.ctx.NEO4J.get_product_by_name(name)
+    #             end = time.time()
+    #             products_responses.append(name_response)
+    #
+    #     json_answer["products_responses"] = products_responses
+    #
+    # elif json_answer.get("query_type", "").lower() == "product_parameters":
+    #     pass
+    # elif json_answer.get("query_type", "").lower() == "products_set":
+    #     pass
+    # elif json_answer.get("query_type", "").lower() == "products_set_parameters":
+    #     pass
 
-        products_responses = []
-        for product in products:
-            name = product.get("name", "")
-            if name:
-                start = time.time()
-                name_response = app.ctx.NEO4J.get_product_by_name(name)
-                end = time.time()
-                products_responses.append(name_response)
-
-        json_answer["products_responses"] = products_responses
 
     return json_answer
