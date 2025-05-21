@@ -55,8 +55,7 @@ class Neo4jConnector:
         uri = f'bolt://{os.environ.get("NEO4J_HOST")}:{os.environ.get("NEO4J_PORT")}'
         self.driver = GraphDatabase.driver(uri, auth=(os.environ.get("NEO4J_USER"), os.environ.get("NEO4J_PASSWORD")))
         self.units_converter = UnitConverter()
-        self.client_gpt = openai.OpenAI(
-            api_key="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")
+        self.client_gpt = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         self.embeddings_model = "text-embedding-3-small"
 
     def close(self):

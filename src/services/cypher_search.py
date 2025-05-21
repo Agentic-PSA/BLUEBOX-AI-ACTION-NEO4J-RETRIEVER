@@ -383,6 +383,9 @@ def check_pn(text):
             return record
     return None
 
+def is_action_code(text):
+    return len(text) == 13 and text[9:].isdigit()
+
 def check_action(text):
     app = Sanic.get_app()
     response = app.ctx.NEO4J.get_product_by_action_code(text)
@@ -499,7 +502,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         name = data["name"]
         logger.info(f"Wyszukiwanie nazwy: {name}")
         start = time.time()
-        name_response = app.ctx.NEO4J.get_product_by_name(name)
+        name_response = app.ctx.NEO4J.get_product_by_name(name, n=50, similarity=0.8)
         end = time.time()
         logger.info(f"Wyszukiwanie nazwy: {end - start} s")
         times["Wyszukiwanie nazwy"] = end - start
@@ -741,11 +744,11 @@ def simple_search(user_query):
 
 
     # Sprawdź Action code
-    start = time.time()
-    action_response = check_action(user_query)
-    end = time.time()
-    times["Wyszukiwanie Action"] = end - start
-    if action_response:
+    if is_action_code(user_query):
+        start = time.time()
+        action_response = check_action(user_query)
+        end = time.time()
+        times["Wyszukiwanie Action"] = end - start
         return {
             "success": True,
             "search_type": "action",
