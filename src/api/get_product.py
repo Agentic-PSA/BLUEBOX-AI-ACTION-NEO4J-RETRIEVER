@@ -21,15 +21,15 @@ class GetProduct(HTTPMethodView):
                 response = request.app.ctx.NEO4J.get_product(ean)
         elif 'pn' in form.cleaned_data:
             pn = form.cleaned_data.get('pn', None)
-            response = request.app.ctx.NEO4J.get_product_by_pn(pn)
+            response = request.app.ctx.NEO4J.get_product_by_pn(pn, parameters)
             if response:
                 return JSONResponse(body=response)
         elif 'action' in form.cleaned_data:
             action = form.cleaned_data.get('action', None)
-            response = request.app.ctx.NEO4J.get_product_by_action_code(action)
+            response = request.app.ctx.NEO4J.get_product_by_action_code(action, parameters)
         elif 'name' in form.cleaned_data:
             name = form.cleaned_data.get('name', None)
-            response = request.app.ctx.NEO4J.get_product_by_name(name)
+            response = request.app.ctx.NEO4J.get_product_by_name(name, with_parameters=parameters)
         if response:
             return JSONResponse(body=response)
         if not response:

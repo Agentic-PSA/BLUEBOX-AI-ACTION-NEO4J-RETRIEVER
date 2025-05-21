@@ -323,21 +323,51 @@ class Neo4jConnector:
                     } as product
                     """
             properties = {"ean": ean_in_db}
+            logger.debug(properties)
             result = session.execute_read(self._execute_query, query, properties)
+            logger.debug(result)
             return result
 
-    def get_product_by_action_code(self, action_code: str):
+    def get_product_by_action_code(self, action_code: str, with_parameters=False):
         with self.get_neo4j_session() as session:
             query = "MATCH (product:Product {action: $action})" + \
                     "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
             properties = {"action": action_code}
-            result = session.execute_read(self._execute_query_multiple, query, properties)
-            logger.debug(result)
-            if result:
-                return result[0][0]
-        return None
+            results = session.execute_read(self._execute_query_multiple, query, properties)
+            logger.debug(results[0])
+            if not results:
+                return None
+            if not with_parameters:
+                return results[0]
+            results_with_properties = []
 
-    def get_product_by_pn(self, pn: str):
+            for result in results[0]:
+                ean = result.get("EAN", "")
+                logger.debug(f"ean: {ean}")
+                query = """
+                                MATCH (prod:Product{EAN: $ean})
+                                OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+                                WITH prod, 
+                                    collect({
+                                      name: prop.name,
+                                      value: prop.value,
+                                      unit: prop.unit
+                                    }) as properties
+                                RETURN {
+                                  EAN: prod.EAN,
+                                  name: prod.name,
+                                  producer: prod.producer,
+                                  action: prod.action,
+                                  product_number: prod.product_number,
+                                  properties: properties
+                                } as product
+                                """
+                properties = {"ean": ean}
+                result_with_properties = session.execute_read(self._execute_query, query, properties)
+                results_with_properties.append(result_with_properties[0])
+            return results_with_properties
+
+    def get_product_by_pn(self, pn: str, with_parameters=False):
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=pn
@@ -346,9 +376,37 @@ class Neo4jConnector:
         with self.driver.session() as session:
             results = session.read_transaction(find_similar_pn, query_vector)
             logger.debug(results)
-        return results
+            if not with_parameters:
+                return results
 
-    def get_product_by_name(self, name:str, n = 10, similarity = None):
+            results_with_properties = []
+            for result in results:
+                ean = result.get("EAN", "")
+                logger.debug(f"ean: {ean}")
+                query = """
+                    MATCH (prod:Product{EAN: $ean})
+                    OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+                    WITH prod, 
+                        collect({
+                          name: prop.name,
+                          value: prop.value,
+                          unit: prop.unit
+                        }) as properties
+                    RETURN {
+                      EAN: prod.EAN,
+                      name: prod.name,
+                      producer: prod.producer,
+                      action: prod.action,
+                      product_number: prod.product_number,
+                      properties: properties
+                    } as product
+                    """
+                properties = {"ean": ean}
+                result_with_properties = session.execute_read(self._execute_query, query, properties)
+                results_with_properties.append(result_with_properties[0])
+            return results_with_properties
+
+    def get_product_by_name(self, name:str, n = 10, with_parameters=False, similarity = None):
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=name
@@ -357,7 +415,35 @@ class Neo4jConnector:
         with self.driver.session() as session:
             results = session.read_transaction(find_similar_products, query_vector, n, similarity)
             logger.debug(results)
-        return results
+            if not with_parameters:
+                return results
+
+            results_with_properties = []
+            for result in results:
+                ean = result.get("EAN", "")
+                logger.debug(f"ean: {ean}")
+                query = """
+                    MATCH (prod:Product{EAN: $ean})
+                    OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+                    WITH prod, 
+                        collect({
+                          name: prop.name,
+                          value: prop.value,
+                          unit: prop.unit
+                        }) as properties
+                    RETURN {
+                      EAN: prod.EAN,
+                      name: prod.name,
+                      producer: prod.producer,
+                      action: prod.action,
+                      product_number: prod.product_number,
+                      properties: properties
+                    } as product
+                    """
+                properties = {"ean": ean}
+                result_with_properties = session.execute_read(self._execute_query, query, properties)
+                results_with_properties.append(result_with_properties[0])
+            return results_with_properties
 
     def get_similar_types(self, text:str):
         response = self.client_gpt.embeddings.create(
