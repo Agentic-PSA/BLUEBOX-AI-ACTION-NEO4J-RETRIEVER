@@ -558,7 +558,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         responses = []
         alternative_search = []
         for name in names:
-            response = app.ctx.NEO4J.get_product_by_name(name, 1, with_parameters=False, similarity=0.8)
+            response = app.ctx.NEO4J.get_product_by_name(name, 1, with_parameters=False, similarity=0.97)
             if response:
                 responses.append(response[0])
             else:
