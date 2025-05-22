@@ -5,7 +5,7 @@ units_variants = {
     "1 / s": ["Hz", "kHz", "MHz", "GHz"],
     "B": ["bit", "kbit", "Mbit", "Gbit", "B", "kB", "MB", "GB", "TB", "PB"],
     "B / s": ["bit / s", "kbit / s", "Mbit / s", "Gbit / s", "B / s", "kB / s", "MB / s", "GB / s", "TB / s"],
-    "g": ["g", "mg", "kg"],
+    "g": ["g", "mg", "kg", "t"],
     "W": ["W", "kW", "MW", "GW", "VA", "kVA", "MVA", "GVA"],
     "Wh": ["Wh", "kWh", "MWh", "GWh"],
     "V": ["V", "mV", "kV"],
