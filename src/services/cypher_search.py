@@ -340,8 +340,12 @@ lub jeżeli użytkownik podał kilka produktów:
 Przykłady:
 Pytanie: Telefon z systemem iOS
 Odpowiedź: {{"types": ["telefony komórkowe"]}}
+Pytanie: Telewizor 55" 4K, Wi-Fi, DP, HDMI, HDR
+Odpowiedź: {{"types": ["telewizory"]}}
 Pytanie: biały iPhone 13
-Odpowiedź: {{"name": "iPhone 13"}}
+Odpowiedź: {{"name": "biały iPhone 13"}}
+Pytanie: Router Mikrotik RB4011iGS+RM
+Odpowiedź: {{"name": "Router Mikrotik RB4011iGS+RM"}}
 Pytanie: iPhone 15, Samsung S24, Xiaomi 15
 Odpowiedź: {{"products": [{{"name": "iPhone 15"}}, {{"name": "Samsung S24"}}, {{"name": "Xiaomi 15"}}] }}
 Pytanie: 1234567890123, 0987654321098
