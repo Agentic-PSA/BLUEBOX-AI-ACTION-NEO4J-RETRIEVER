@@ -226,10 +226,12 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
 Pola podaj w requiredProperties. Wypełnij tylko te pola, których wartości są podane w pytaniu i które są na liście pól danego typu.
 Ustaw unit na null jeżeli nie jest potrzebne.
 Dostępne jednostki:
-m, in, nm, mm, cm, dm, g, mg, kg, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
+m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
 W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: <, >, <=, >, <>.
 Znak warunku <> oznacza różny i działa też dla napisów. 
-Jeżeli użytkownik podał kilka możliwych wartości parametrów podaj je jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
+Jeżeli użytkownik podał przedział wartości parametru zapisz go jako dwa oddzielne warunki używając odpowiednich znaków nierówności.
+Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
+Jeżeli użytkownik podał tylko jedną wartość dla danego parametru podaj tą wartość w value.
 Pytanie użytkownika:
 {question}
 
@@ -240,29 +242,41 @@ Odpowiedz w formacie json:
 {{
   "requiredProperties": [
     {{
-      "name": "",
-      "value": 0,
-      "unit": null
+      "name": "property_name",
+      "value": 5,
+      "unit": "kg"
       "condition": "="
     }},
     {{
-      "name": "",
+      "name": "property_name1",
       "value": "wartość",
       "unit": null
       "condition": "="
     }},
     {{
-      "name": "",
+      "name": "property_name2",
       "value": "wartość",
       "unit": null
       "condition": "<>"
     }},
     {{
-      "name": "",
+      "name": "property_name3",
       "value": ["wartość 1", "wartość 2", "wartość 3"],
       "unit": null
       "condition": "="
-    }}
+    }},
+    {{
+      "name": "property_name4",
+      "value": 50,
+      "unit": in
+      "condition": ">="
+    }},
+    {{
+      "name": "property_name4",
+      "value": 80,
+      "unit": in
+      "condition": "<="
+    }},
   ]
 }}
     '''
