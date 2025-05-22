@@ -71,13 +71,14 @@
         async function sendEANSearchRequest() {
             const eanValue = document.getElementById('ean').value;
             const resultContainer = document.getElementById('result');
+            const parametersValue = document.getElementById('parameters').checked;
             try {
                 const response = await fetch('http://172.19.3.220:5013/get_product', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ ean: eanValue })
+                    body: JSON.stringify({ ean: eanValue, parameters: parametersValue })
                 });
                 const result = await response.json();
                 resultContainer.textContent = JSON.stringify(result, null, 2);
@@ -89,13 +90,14 @@
         async function sendPNSearchRequest() {
             const pnValue = document.getElementById('pn').value;
             const resultContainer = document.getElementById('result');
+            const parametersValue = document.getElementById('parameters').checked;
             try {
                 const response = await fetch('http://172.19.3.220:5013/get_product', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ pn: pnValue })
+                    body: JSON.stringify({ pn: pnValue, parameters: parametersValue })
                 });
                 const result = await response.json();
                 resultContainer.textContent = JSON.stringify(result, null, 2);
@@ -107,13 +109,14 @@
         async function sendNameSearchRequest() {
             const nameValue = document.getElementById('name').value;
             const resultContainer = document.getElementById('result');
+            const parametersValue = document.getElementById('parameters').checked;
             try {
                 const response = await fetch('http://172.19.3.220:5013/get_product', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ name: nameValue })
+                    body: JSON.stringify({ name: nameValue, parameters: parametersValue })
                 });
                 const result = await response.json();
                 resultContainer.textContent = JSON.stringify(result, null, 2);
