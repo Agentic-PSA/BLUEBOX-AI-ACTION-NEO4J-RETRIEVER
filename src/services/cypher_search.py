@@ -540,7 +540,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         responses = []
         alternative_search = []
         for name in names:
-            response = app.ctx.NEO4J.get_product_by_name(name, 1,  0.8)
+            response = app.ctx.NEO4J.get_product_by_name(name, 1, with_parameters=False, similarity=0.8)
             if response:
                 responses.append(response[0])
             else:
@@ -549,7 +549,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             ean_response = app.ctx.NEO4J.get_product(ean)
             responses.append(ean_response)
         for pn in pns:
-            pn_response = app.ctx.NEO4J.get_product_by_pn(pn)
+            pn_response = app.ctx.NEO4J.get_product_by_pn(pn, with_parameters=False)
             if pn_response:
                 responses.append(pn_response[0])
         end = time.time()

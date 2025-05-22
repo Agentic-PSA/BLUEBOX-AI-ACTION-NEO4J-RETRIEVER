@@ -334,9 +334,10 @@ class Neo4jConnector:
                     "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
             properties = {"action": action_code}
             results = session.execute_read(self._execute_query_multiple, query, properties)
-            logger.debug(results[0])
+
             if not results:
                 return None
+            logger.debug(results[0])
             if not with_parameters:
                 return results[0]
             results_with_properties = []
