@@ -1,3 +1,5 @@
+import os
+
 import httpx
 from httpx import Client
 import uuid
@@ -36,11 +38,35 @@ def llm(prompt):
     print(response_text)
     return response_text
 
+def search_index(names=[]):
+    client = Client(verify=False)
+    items = [{
+                "item_id": str(uuid.uuid4()),
+                "item_description": name
+            } for name in names]
+
+    token = os.environ.get("ACTION_TOKEN")
+    response = client.post(
+        'https://bbx.action.pl:5555/search_index',
+        headers={
+            'Authorization': f'Bearer {token}'
+        },
+        json=items,
+        timeout=httpx.Timeout(60)
+    )
+    logger.debug(response.json())
+
+    results = []
+    for item in response.json():
+        item_number = item.get('item_number', '')
+        if item_number:
+            results.append(item_number)
+    return results
+
 def search_group(descriptions=[]):
     client = Client(verify=False)
 
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwibmFtZSI6Im1idGVzdCIsInNoYXJlcG9pbnRfZW1haWwiOiJ4QHgucGwifQ.MIqGiWA2uYuW6YYZ_1movoX-92KcPdRTkVLcjINFX5M'
-
+    token = os.environ.get("ACTION_TOKEN")
     response = client.post(
         'https://bbx.action.pl:5555/search_group',
         headers={
@@ -576,7 +602,15 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
 
         if alternative_search:
             start = time.time()
-            responses += search_group(alternative_search)
+            alternative_search_response = search_index(alternative_search)
+            logger.debug(alternative_search_response)
+            for act_code in alternative_search_response:
+                act_code_response = check_action(act_code)
+                if act_code_response:
+                    responses.append(act_code)
+                else:
+                    logger.warning(f"{act_code} not found")
+
             end = time.time()
             logger.info(f"Alternatywne szukanie produktów: {end - start} s")
             times["Alternatywne szukanie produktów"] = end - start
