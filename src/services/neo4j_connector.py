@@ -6,6 +6,15 @@ from neo4j import GraphDatabase
 
 from ..utils import UnitConverter
 
+def find_products_fulltext(tx, name, n = 10, similarity = None):
+    query = f"CALL db.index.fulltext.queryNodes('product_name_text', $name) yield node as p, score AS similarity "
+    if similarity:
+        query += f"WITH p, similarity WHERE similarity >= {similarity} "
+    query += "RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
+    query += f"LIMIT {n}"
+    result = tx.run(query, name=name)
+    return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
+             "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
 
 def find_similar_products(tx, query_vector, n = 10, similarity = None):
     query = f"CALL db.index.vector.queryNodes('name', {n}, $query_vector) yield node as p, score AS similarity "
@@ -411,13 +420,13 @@ class Neo4jConnector:
             return results_with_properties
 
     def get_product_by_name(self, name:str, n = 10, with_parameters=False, similarity = None):
-        response = self.client_gpt.embeddings.create(
-            model=self.embeddings_model,
-            input=name
-        )
-        query_vector = response.data[0].embedding
+        # response = self.client_gpt.embeddings.create(
+        #     model=self.embeddings_model,
+        #     input=name
+        # )
+        # query_vector = response.data[0].embedding
         with self.driver.session() as session:
-            results = session.read_transaction(find_similar_products, query_vector, n, similarity)
+            results = session.read_transaction(find_products_fulltext, name, n, similarity)
             logger.debug(results)
             if not with_parameters:
                 return results
