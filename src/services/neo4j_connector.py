@@ -306,12 +306,13 @@ class Neo4jConnector:
 
             query = """
                     MATCH (prod:Product{EAN: $ean})
-                    OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+                    OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
                     WITH prod, 
                         collect({
                           name: prop.name,
                           value: prop.value,
-                          unit: prop.unit
+                          unit: prop.unit,
+                          section: r.section_name
                         }) as properties
                     RETURN {
                       EAN: prod.EAN,
@@ -347,12 +348,13 @@ class Neo4jConnector:
                 logger.debug(f"ean: {ean}")
                 query = """
                                 MATCH (prod:Product{EAN: $ean})
-                                OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+                                OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
                                 WITH prod, 
                                     collect({
                                       name: prop.name,
                                       value: prop.value,
-                                      unit: prop.unit
+                                      unit: prop.unit,
+                                      section: r.section_name
                                     }) as properties
                                 RETURN {
                                   EAN: prod.EAN,
@@ -386,12 +388,13 @@ class Neo4jConnector:
                 logger.debug(f"ean: {ean}")
                 query = """
                     MATCH (prod:Product{EAN: $ean})
-                    OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+                    OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
                     WITH prod, 
                         collect({
                           name: prop.name,
                           value: prop.value,
-                          unit: prop.unit
+                          unit: prop.unit,
+                          section: r.section_name
                         }) as properties
                     RETURN {
                       EAN: prod.EAN,
@@ -425,12 +428,13 @@ class Neo4jConnector:
                 logger.debug(f"ean: {ean}")
                 query = """
                     MATCH (prod:Product{EAN: $ean})
-                    OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
+                    OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
                     WITH prod, 
                         collect({
                           name: prop.name,
                           value: prop.value,
-                          unit: prop.unit
+                          unit: prop.unit,
+                          section: r.section_name
                         }) as properties
                     RETURN {
                       EAN: prod.EAN,
