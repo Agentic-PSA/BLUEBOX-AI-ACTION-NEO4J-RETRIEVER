@@ -1,4 +1,8 @@
+import json
+import time
+
 import psycopg2
+from psycopg2.extras import Json
 
 class SpiffConnector:
     def __init__(self, user, password, host, port, database):
@@ -26,6 +30,19 @@ class SpiffConnector:
         records = cursor.fetchall()
         cursor.close()
         return records
+
+    def execute_insert(self, connection, query, values):
+        cursor = connection.cursor()
+        try:
+            cursor.execute(query, values)
+            connection.commit()
+        except Exception as e:
+            connection.rollback()
+            print("Błąd podczas wstawiania:", e)
+        finally:
+            cursor.close()
+            connection.close()
+        return None
 
 
     def get_process_instances_ids_by_identifier(self, process_model_identifier, status=None):
@@ -100,5 +117,63 @@ class SpiffConnector:
                 return None
             return records[0][0]
 
+        finally:
+            self.close_connection(connection)
+
+    def get_values_from_data_store(self, data_store_name, top_level_key):
+        query = f"SELECT id FROM public.kkv_data_store WHERE identifier = '{data_store_name}';"
+
+        connection = self.connect()
+        try:
+            records = self.execute_query(connection, query)
+            kkv_data_store_id = records[0][0]
+            query = f"""SELECT secondary_key, value FROM public.kkv_data_store_entry WHERE kkv_data_store_id = '{kkv_data_store_id}' 
+            AND top_level_key = '{top_level_key}';"""
+            records = self.execute_query(connection, query)
+            if not records:
+                return None
+            return records
+
+        finally:
+            self.close_connection(connection)
+
+
+    def add_value_to_data_store(self, data_store_name, top_level_key, secondary_key, value):
+        query = f"SELECT id FROM public.kkv_data_store WHERE identifier = '{data_store_name}';"
+
+        connection = self.connect()
+        try:
+            records = self.execute_query(connection, query)
+            kkv_data_store_id = records[0][0]
+            query = """
+        INSERT INTO public.kkv_data_store_entry (
+            kkv_data_store_id, top_level_key, secondary_key, value, created_at_in_seconds, updated_at_in_seconds
+        ) VALUES (%s, %s, %s, %s, %s, %s)
+        """
+            now_seconds = int(time.time())
+            values = (kkv_data_store_id, top_level_key, secondary_key, Json(value), now_seconds, now_seconds)
+            self.execute_insert(connection, query, values)
+        finally:
+            self.close_connection(connection)
+
+    def update_value_to_data_store(self, data_store_name, top_level_key, secondary_key, value):
+        query = f"SELECT id FROM public.kkv_data_store WHERE identifier = '{data_store_name}';"
+
+        connection = self.connect()
+        try:
+            records = self.execute_query(connection, query)
+            kkv_data_store_id = records[0][0]
+            query = """
+        INSERT INTO public.kkv_data_store_entry (
+            kkv_data_store_id, top_level_key, secondary_key, value, created_at_in_seconds, updated_at_in_seconds
+        ) VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (kkv_data_store_id, top_level_key, secondary_key)
+        DO UPDATE SET
+            value = EXCLUDED.value,
+            updated_at_in_seconds = EXCLUDED.updated_at_in_seconds
+        """
+            now_seconds = int(time.time())
+            values = (kkv_data_store_id, top_level_key, secondary_key, Json(value), now_seconds, now_seconds)
+            self.execute_insert(connection, query, values)
         finally:
             self.close_connection(connection)
