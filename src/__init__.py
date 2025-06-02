@@ -8,7 +8,7 @@ from sanic_cors import CORS
 from .services import Neo4jConnector
 from .utils import UnitConverter
 
-from .api import AddNode, AddType, AddProduct, Cypher, Compatibility
+from .api import AddNode, AddType, AddProduct, Cypher, Compatibility, PropertiesValues
 from .api import GetProduct, GetProducts, Search, SimpleSearch
 
 
@@ -33,6 +33,7 @@ def get_app(root_path: str) -> Sanic:
     app.add_route(AddType.as_view(), 'add_type/')
     app.add_route(Cypher.as_view(), 'cypher/')
     app.add_route(Compatibility.as_view(), 'compatibility/')
+    app.add_route(PropertiesValues.as_view(), 'properties_values/')
 
 
     return app

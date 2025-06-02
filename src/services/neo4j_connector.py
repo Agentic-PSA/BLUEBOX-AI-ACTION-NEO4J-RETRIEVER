@@ -2,7 +2,7 @@ import openai
 from sanic.log import logger
 import os
 
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, Result
 
 from ..utils import UnitConverter
 
@@ -633,3 +633,22 @@ class Neo4jConnector:
             }
             result = session.execute_write(self._execute_query, query, properties)
             return result["price"] if result else None
+
+    def get_params_values(self, names, types):
+        cypher_query = '''
+        MATCH (n)-[:HAS]->(p:Property_PL {name: $name})
+        WHERE any(label in labels(n) WHERE label IN $labels)
+        RETURN DISTINCT p.value
+        '''
+
+        params_values = {}
+        with self.driver.session() as session:
+            for name in names:
+                name_params = {'name': name, 'labels': types}
+                logger.debug(name_params)
+                result: Result = session.run(cypher_query, name_params)
+                name_values = [v[0] for v in result.values()]
+                logger.debug(name_values)
+                params_values[name] = name_values
+
+        return params_values
