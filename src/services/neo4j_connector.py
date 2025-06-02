@@ -297,6 +297,33 @@ class Neo4jConnector:
                     return result[0][0]
         return None
 
+    def get_product_price(self, action_code: str, currency: str):
+        with self.get_neo4j_session() as session:
+            #query = "MATCH (product:Product {action: $action_code})-[:HAS]->(price:Price {currency: $currency}) RETURN price"
+            query = """MATCH (product:Product {action: $action_code})
+                OPTIONAL MATCH (product)-[:HAS]->(price:Price{currency: "PLN"})
+                RETURN product.EAN AS EAN, product.action AS action, product.name AS name, price"""
+            properties = {"action_code": action_code, "currency": currency}
+            result = session.execute_read(self._execute_query_multiple, query, properties)
+            logger.debug(result)
+            if result:
+                return result[0]
+        return None
+
+    def update_price_value(self, price_id, new_value):
+        query = """
+            MATCH (price:Price)
+            WHERE elementId(price) = $price_id
+            SET price.value = $new_value
+            RETURN price
+        """
+        with self.get_neo4j_session() as session:
+            return session.execute_write(lambda tx: tx.run(
+                                                        query,
+                                                        price_id=price_id,
+                                                        new_value=new_value
+                                                    ).single())
+
     def get_product_with_parameters(self, ean: str):
         variants = self.generate_ean_variants(ean)
         ean_in_db = None
@@ -590,3 +617,19 @@ class Neo4jConnector:
             result = session.run(query, skip=skip, limit=limit)
             nodes = [record["product"] for record in result]
             return nodes
+
+    def create_product_price(self, action_code, price, currency, quantity):
+        with self.driver.session() as session:
+            query = """
+            MATCH (product:Product {action: $action_code})
+            CREATE (product)-[:HAS]->(price:Price {value: $price, currency: $currency, quantity: $quantity})
+            RETURN price
+            """
+            properties = {
+                "action_code": action_code,
+                "price": price,
+                "currency": currency,
+                "quantity": quantity
+            }
+            result = session.execute_write(self._execute_query, query, properties)
+            return result["price"] if result else None
