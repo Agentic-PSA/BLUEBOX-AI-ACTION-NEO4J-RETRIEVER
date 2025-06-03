@@ -8,3 +8,4 @@ from .cypher import Cypher
 from .compatibility import Compatibility
 from .get_products import GetProducts
 from .properties_values import PropertiesValues
+from .add_values import AddValues

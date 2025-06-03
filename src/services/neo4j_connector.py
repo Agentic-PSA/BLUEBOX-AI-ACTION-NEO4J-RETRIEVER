@@ -85,6 +85,19 @@ class Neo4jConnector:
                 return self._serialize_node(result["n"])
             return None
 
+    def add_value_node(self, properties: dict):
+        correct_value = properties.pop("correct_value")
+        with self.get_neo4j_session() as session:
+            query = f"MERGE (n:Value {{"
+            query += ", ".join([f"`{key}`: $`{key}`" for key in properties.keys()])
+            query += "}) SET n.correct_value = $correct_value RETURN n"
+            logger.info(query)
+            properties["correct_value"] = correct_value
+            result = session.execute_write(self._execute_query, query, properties)
+            if result is not None:
+                return self._serialize_node(result["n"])
+            return None
+
     def add_property_node(self, product_node: dict, property_name: str, property_value, property_label: str, relationship_properties: dict = None):
         logger.info(f"Property type {type(property_value)}")
         property_label = f"`{property_label}`" if ' ' in property_label and "`" not in property_label else property_label
