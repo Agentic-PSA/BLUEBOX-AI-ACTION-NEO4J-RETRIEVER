@@ -251,6 +251,8 @@ def generate_params(question, product_specification, labels):
 Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie parametry do zapytania bazy danych.
 Pola podaj w requiredProperties. Wypełnij tylko te pola, których wartości są podane w pytaniu i które są na liście pól danego typu.
 Ustaw unit na null jeżeli nie jest potrzebne.
+Jeżeli użytkownik pyta o cenę podaj ją w polu price jako słownik z kluczami min, max, equal w zależności od tego jakie wartości podał użytkownik. 
+W polu currency podaj walutę ceny, jeżeli nie jest podana w pytaniu to PLN. Możliwe waluty: PLN, EUR, USD.
 Dostępne jednostki:
 m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
 W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: <, >, <=, >, <>.
@@ -303,7 +305,13 @@ Odpowiedz w formacie json:
       "unit": in
       "condition": "<="
     }},
-  ]
+  ],
+  "price": {{
+    "min": 100,
+    "max": 1000,
+    "equal": 500,
+    "currency": "PLN"
+  }}
 }}
     '''
 
@@ -315,11 +323,25 @@ Odpowiedz w formacie json:
 
 
 def exec_query(params, return_parameters=False):
+    price_query = ""
+    price = params.get("price")
+    if price:
+        currency = params.get("currency", "PLN")
+        if price.get("equal"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price {{value: {price.get("equal")}, currency: "{currency}"}})'
+        elif price.get("min") and price.get("max"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.value <= {price.get("max")} AND price.currency = "{currency}"'
+        elif price.get("min"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.currency = "{currency}"'
+        elif price.get("max"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value <= {price.get("max")} AND price.currency = "{currency}"'
+
     cypher_query = """
 MATCH (product:Product)
 WHERE any(label in $productTypes WHERE label IN labels(product))
-OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
-WITH product, collect({
+OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL) """
+    cypher_query += price_query
+    cypher_query += """ WITH product, collect({
   name: prop.name,
   value: prop.value,
   unit: prop.unit
