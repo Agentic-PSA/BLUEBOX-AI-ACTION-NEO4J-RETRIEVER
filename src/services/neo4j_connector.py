@@ -461,6 +461,46 @@ class Neo4jConnector:
                 results_with_properties.append(result_with_properties[0])
             return results_with_properties
 
+    def get_product_by_name_vector(self, name:str, n = 10, with_parameters=False, similarity = None):
+        response = self.client_gpt.embeddings.create(
+            model=self.embeddings_model,
+            input=name
+        )
+        query_vector = response.data[0].embedding
+        with self.driver.session() as session:
+            results = session.read_transaction(find_similar_products, query_vector, n, similarity)
+            logger.debug(results)
+            if not with_parameters:
+                return results
+
+            results_with_properties = []
+            for result in results:
+                ean = result.get("EAN", "")
+                logger.debug(f"ean: {ean}")
+                query = """
+                    MATCH (prod:Product{EAN: $ean})
+                    OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+                    WITH prod, 
+                        collect({
+                          name: prop.name,
+                          value: prop.value,
+                          unit: prop.unit,
+                          section: r.section_name
+                        }) as properties
+                    RETURN {
+                      EAN: prod.EAN,
+                      name: prod.name,
+                      producer: prod.producer,
+                      action: prod.action,
+                      product_number: prod.product_number,
+                      properties: properties
+                    } as product
+                    """
+                properties = {"ean": ean}
+                result_with_properties = session.execute_read(self._execute_query, query, properties)
+                results_with_properties.append(result_with_properties[0])
+            return results_with_properties
+
     def get_product_by_name(self, name:str, n = 10, with_parameters=False, similarity = None):
         # response = self.client_gpt.embeddings.create(
         #     model=self.embeddings_model,

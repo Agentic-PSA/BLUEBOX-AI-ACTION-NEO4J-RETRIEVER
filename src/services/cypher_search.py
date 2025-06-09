@@ -568,7 +568,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         name = data["name"]
         logger.info(f"Wyszukiwanie nazwy: {name}")
         start = time.time()
-        name_response = app.ctx.NEO4J.get_product_by_name(name, n=50, similarity=0.8)
+        name_response = app.ctx.NEO4J.get_product_by_name_vector(name, n=50, similarity=0.8)
         end = time.time()
         logger.info(f"Wyszukiwanie nazwy: {end - start} s")
         times["Wyszukiwanie nazwy"] = end - start
@@ -852,9 +852,6 @@ def simple_search(user_query):
     # Szukaj nazwy
     logger.info(f"Szukaj nazwy: {user_query}")
     name_response = app.ctx.NEO4J.get_product_by_name(user_query, n=40, with_parameters=False, similarity=0.5)
-    if name_response:
-        if name_response[0].get("similarity", 0) >= 0.99:
-            name_response = name_response[:1]
 
     end = time.time()
     times["Wyszukiwanie nazwy"] = end - start
