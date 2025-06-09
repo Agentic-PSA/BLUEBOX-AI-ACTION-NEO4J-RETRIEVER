@@ -1,3 +1,5 @@
+import re
+
 from sanic.log import logger
 from sanic.request import Request
 from sanic.views import HTTPMethodView
@@ -15,6 +17,7 @@ class SimpleSearch(HTTPMethodView):
         if not form.is_valid():
             return JSONResponse(body=form.errors, status=400)
         query = form.cleaned_data['query']
+        query = re.sub(r'(?<!\\)"', r'\"', query)
 
         response = simple_search(query)
         if not response:

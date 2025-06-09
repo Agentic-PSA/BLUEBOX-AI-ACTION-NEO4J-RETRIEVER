@@ -1,3 +1,5 @@
+import re
+
 from sanic.log import logger
 from sanic.request import Request
 from sanic.views import HTTPMethodView
@@ -16,6 +18,7 @@ class Search(HTTPMethodView):
         if not form.is_valid():
             return JSONResponse(body=form.errors, status=400)
         query = form.cleaned_data['query']
+        query = re.sub(r'(?<!\\)"', r'\"', query)
         parameters = form.cleaned_data.get('parameters', False)
         logger.debug(f"parameters: {parameters}")
         ai_answer = form.cleaned_data.get('ai', False)

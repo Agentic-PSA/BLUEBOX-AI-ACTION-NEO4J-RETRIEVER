@@ -1,3 +1,5 @@
+import re
+
 import openai
 from sanic.log import logger
 import os
@@ -465,6 +467,7 @@ class Neo4jConnector:
         #     input=name
         # )
         # query_vector = response.data[0].embedding
+        name = re.sub(r'(?<!\\)"', r'\"', name)
         with self.driver.session() as session:
             results = session.read_transaction(find_products_fulltext, name, n, similarity)
             logger.debug(results)
