@@ -199,8 +199,9 @@ class Neo4jConnector:
                 for key, value in unit_variants.items():
                     property_data = {"property_name": property_name,
                                      "property_value": value,
-                                     "property_unit": key}
-                    query = f"MATCH (n:{property_label} {{`name`: $property_name, `value`: $property_value, `unit`: $property_unit}}) RETURN n"
+                                     "property_unit": key,
+                                     "default_unit": key == property_unit}
+                    query = f"MATCH (n:{property_label} {{`name`: $property_name, `value`: $property_value, `unit`: $property_unit, `default_unit`: $default_unit}}) RETURN n"
                     logger.info(query)
                     result = session.execute_read(self._execute_query, query, property_data)
 
