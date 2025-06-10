@@ -55,7 +55,7 @@ class UnitConverter:
         short_unit = f"{x_preffered.u:~}"
         unit_variants = units_variants.get(short_unit, [])
         if not unit_variants:
-            return {x.u: x.m}
+            return {unit: value}
         result = {}
         for variant in unit_variants:
             result[variant] = x.to(variant).m
