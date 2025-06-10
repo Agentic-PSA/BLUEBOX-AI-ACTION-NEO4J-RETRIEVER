@@ -200,14 +200,15 @@ class Neo4jConnector:
                     property_data = {"property_name": property_name,
                                      "property_value": value,
                                      "property_unit": key,
-                                     "default_unit": key == property_unit}
-                    query = f"MATCH (n:{property_label} {{`name`: $property_name, `value`: $property_value, `unit`: $property_unit, `default_unit`: $default_unit}}) RETURN n"
+                                     "default_unit": key == property_unit
+                                     }
+                    query = f"MATCH (n:{property_label} {{`name`: $property_name, `value`: $property_value, `unit`: $property_unit}}) RETURN n"
                     logger.info(query)
                     result = session.execute_read(self._execute_query, query, property_data)
 
                     if result is None:
                             logger.info(f"Creating node")
-                            query = f"CREATE (n:{property_label} {{`name`: $property_name, `value`: $property_value, `unit`: $property_unit}}) RETURN n"
+                            query = f"CREATE (n:{property_label} {{`name`: $property_name, `value`: $property_value, `unit`: $property_unit, `default_unit`: $default_unit}}) RETURN n"
                             logger.info(query)
                             result = session.execute_write(self._execute_query, query, property_data)
                             logger.info(result)
