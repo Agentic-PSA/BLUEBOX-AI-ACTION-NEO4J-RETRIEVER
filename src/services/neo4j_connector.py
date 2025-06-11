@@ -360,6 +360,7 @@ class Neo4jConnector:
             query = """
                     MATCH (prod:Product{EAN: $ean})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+                    WHERE prop.default_unit IS NULL OR prop.default_unit = true
                     WITH prod, 
                         collect({
                           name: prop.name,
@@ -402,6 +403,7 @@ class Neo4jConnector:
                 query = """
                                 MATCH (prod:Product{EAN: $ean})
                                 OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+                                WHERE prop.default_unit IS NULL OR prop.default_unit = true
                                 WITH prod, 
                                     collect({
                                       name: prop.name,
@@ -442,6 +444,7 @@ class Neo4jConnector:
                 query = """
                     MATCH (prod:Product{EAN: $ean})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+                    WHERE prop.default_unit IS NULL OR prop.default_unit = true
                     WITH prod, 
                         collect({
                           name: prop.name,
@@ -482,6 +485,7 @@ class Neo4jConnector:
                 query = """
                     MATCH (prod:Product{EAN: $ean})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+                    WHERE prop.default_unit IS NULL OR prop.default_unit = true
                     WITH prod, 
                         collect({
                           name: prop.name,
@@ -523,6 +527,7 @@ class Neo4jConnector:
                 query = """
                     MATCH (prod:Product{EAN: $ean})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+                    WHERE prop.default_unit IS NULL OR prop.default_unit = true
                     WITH prod, 
                         collect({
                           name: prop.name,

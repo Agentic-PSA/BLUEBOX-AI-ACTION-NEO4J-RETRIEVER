@@ -559,6 +559,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         }
 
     types_query = user_query
+    # if "compatible_with" in data:
+    #     logger.info(f"Kompatybilność z produktem: {data['compatible_with']}")
+    #     compatibility_search(data)
     if "types" in data:
         types = data["types"]
         if not types:
@@ -568,7 +571,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         name = data["name"]
         logger.info(f"Wyszukiwanie nazwy: {name}")
         start = time.time()
-        name_response = app.ctx.NEO4J.get_product_by_name_vector(name, n=50, similarity=0.8)
+        name_response = app.ctx.NEO4J.get_product_by_name_vector(name, n=50, with_parameters=return_parameters, similarity=0.8)
         end = time.time()
         logger.info(f"Wyszukiwanie nazwy: {end - start} s")
         times["Wyszukiwanie nazwy"] = end - start
@@ -606,16 +609,19 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         responses = []
         alternative_search = []
         for name in names:
-            response = app.ctx.NEO4J.get_product_by_name(name, 1, with_parameters=False, similarity=0.97)
+            response = app.ctx.NEO4J.get_product_by_name(name, 1, with_parameters=return_parameters, similarity=0.97)
             if response:
                 responses.append(response[0])
             else:
                 alternative_search.append(name)
         for ean in eans:
-            ean_response = app.ctx.NEO4J.get_product(ean)
+            if return_parameters:
+                ean_response = app.ctx.NEO4J.get_product_with_parameters(ean)
+            else:
+                ean_response = app.ctx.NEO4J.get_product(ean)
             responses.append(ean_response)
         for pn in pns:
-            pn_response = app.ctx.NEO4J.get_product_by_pn(pn, with_parameters=False)
+            pn_response = app.ctx.NEO4J.get_product_by_pn(pn, with_parameters=return_parameters)
             if pn_response:
                 responses.append(pn_response[0])
         end = time.time()
