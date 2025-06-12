@@ -14,6 +14,7 @@ def find_products_fulltext(tx, name, n = 10, similarity = None):
         query += f"WITH p, similarity WHERE similarity >= {similarity} "
     query += "RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
     query += f"LIMIT {n}"
+    name = re.sub(r'(?<!/)/(?!/)', '//', name)
     result = tx.run(query, name=name)
     return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
@@ -477,7 +478,6 @@ class Neo4jConnector:
             logger.debug(results)
             if not with_parameters:
                 return results
-
             results_with_properties = []
             for result in results:
                 ean = result.get("EAN", "")
