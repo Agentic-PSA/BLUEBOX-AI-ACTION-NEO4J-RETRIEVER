@@ -12,26 +12,26 @@ def find_products_fulltext(tx, name, n = 10, similarity = None):
     query = f"CALL db.index.fulltext.queryNodes('product_name_text', $name) yield node as p, score AS similarity "
     if similarity:
         query += f"WITH p, similarity WHERE similarity >= {similarity} "
-    query += "RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
+    query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
     query += f"LIMIT {n}"
     name = re.sub(r'(?<!/)/(?!/)', '//', name)
     result = tx.run(query, name=name)
-    return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
+    return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
 
 def find_similar_products(tx, query_vector, n = 10, similarity = None):
     query = f"CALL db.index.vector.queryNodes('name', {n}, $query_vector) yield node as p, score AS similarity "
     if similarity:
         query += f"WITH p, similarity WHERE similarity >= {similarity} "
-    query += "RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity"
+    query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity"
     result = tx.run(query, query_vector=query_vector)
-    return [{"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
+    return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
 
 def find_similar_pn(tx, query_vector):
     query = """
     CALL db.index.vector.queryNodes('product_number', 5, $query_vector) yield node as p, score AS similarity
-    RETURN p.name AS productName, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
+    RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
     """
 
     similarity_100 = False
@@ -42,7 +42,7 @@ def find_similar_pn(tx, query_vector):
             similarity_100 = True
         if similarity_100 and record["similarity"] < 0.999:
             break
-        formatted_results.append({"EAN": record["EAN"], "productName": record["productName"], "similarity": record["similarity"],
+        formatted_results.append({"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]})
     return formatted_results
 
