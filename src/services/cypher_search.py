@@ -590,12 +590,17 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 "time": sum(times.values())
             }
         logger.info(f"Kompatybilność z produktem: {data['compatible_with']}")
-        compatibility_response = compatibility_search(data)
+        start = time.time()
+        compatibility_response, types = compatibility_search(data)
+        end = time.time()
+        logger.info(f"Wyszukiwanie kompatybilnych produktów: {end - start} s")
+        times["Wyszukiwanie kompatybilnych produktów"] = end - start
         return {
             "success": True,
             "search_type": "compatibility",
             "compatible_with": data["compatible_with"],
             "results": compatibility_response,
+            "types": types,
             "times": times,
             "time": sum(times.values())
         }
@@ -843,21 +848,32 @@ def compatibility_search(data):
     app = Sanic.get_app()
     types = data.get("types", [])
     compatible_with = data.get("compatible_with", {})
-    ean = ""
-    if compatible_with.get("EAN"):
-        ean = compatible_with["EAN"]
-        response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
-        logger.debug(response)
-        return response
-    elif compatible_with.get("name"):
-        name = compatible_with["name"]
-    elif compatible_with.get("PN"):
+    if compatible_with.get("PN"):
         pn = compatible_with["PN"]
         response = app.ctx.NEO4J.get_compatible_products(types=types, pn=pn)
         logger.debug(response)
-        return response
+        return response, types
+    ean = ""
+    if compatible_with.get("name"):
+        name = compatible_with["name"]
+        start = time.time()
+        name_response = app.ctx.NEO4J.get_product_by_name_vector(name, n=1, similarity=0.9)
+        logger.info(f"Name response: {name_response}")
+        if name_response:
+            ean = name_response[0].get("EAN")
+        end = time.time()
+        logger.info(f"Wyszukiwanie nazwy: {end - start} s")
+    elif compatible_with.get("EAN"):
+        ean = compatible_with["EAN"]
     else:
         logger.error("Brak informacji o kompatybilności w danych wejściowych")
+        return []
+    logger.info(f"EAN: {ean}")
+    response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
+    logger.debug(response)
+    return response, types
+
+
 
 
 def simple_search(user_query):
