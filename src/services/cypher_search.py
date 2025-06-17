@@ -373,12 +373,12 @@ RETURN product
         records = list(result)
         if not len(records):
             print("Brak wyników")
-        results = [record.data() for record in records]
+        results = [record.data().get("product", {}) for record in records]
         for record in results:
-            if record.get("product", {}).get("nameEmbedding"):
-                del record["product"]["nameEmbedding"]
-            if record.get("product", {}).get("productNumberEmbedding"):
-                del record["product"]["productNumberEmbedding"]
+            if record.get("nameEmbedding"):
+                del record["nameEmbedding"]
+            if record.get("productNumberEmbedding"):
+                del record["productNumberEmbedding"]
         return results
 
 def get_embedding(text, model="text-embedding-3-small"):
