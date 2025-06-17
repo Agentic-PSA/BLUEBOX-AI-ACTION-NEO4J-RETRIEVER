@@ -315,6 +315,36 @@ class Neo4jConnector:
                     return result[0][0]
         return None
 
+    def get_compatible_products(self, types=[], ean=None, pn=None):
+        if not types:
+            return []
+        if ean:
+            product_query = "{EAN: $ean}"
+        elif pn:
+            product_query = "{product_number: $pn}"
+        else:
+            return []
+
+        labels = [type.replace("-", "_") for type in types]
+        logger.debug(f"Labels: {labels}")
+        variants = self.generate_ean_variants(ean) if ean else [pn]
+        for ean_variant in variants:
+            with self.get_neo4j_session() as session:
+                query = "MATCH (product:Product" + product_query  + """)
+OPTIONAL MATCH (product)-[:COMPATIBLE]-(other:Product)
+WHERE any(label IN labels(other) WHERE label IN $labels)
+RETURN 
+  apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product,
+  collect(
+    apoc.map.submap(other, ['EAN', 'name', 'producer', 'product_number', 'action'])
+  ) AS compatible_products
+  """
+                properties = {"ean": ean_variant, "pn": pn, "labels": labels}
+                result = session.execute_read(self._execute_query_multiple, query, properties)
+                logger.debug(result)
+                if result:
+                    return result[0][1]
+
     def get_product_price(self, action_code: str, currency: str):
         with self.get_neo4j_session() as session:
             #query = "MATCH (product:Product {action: $action_code})-[:HAS]->(price:Price {currency: $currency}) RETURN price"

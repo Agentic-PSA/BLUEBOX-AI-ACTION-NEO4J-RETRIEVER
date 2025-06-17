@@ -392,12 +392,16 @@ def analize_query(user_query):
     prompt = f'''
 Użytkownik może szukać produktów podając jego parametry lub szukać jednego lub kilku konkretnych produktów podając nazwy, numery EAN lub Part number.
 Określ jakich typów produktów może dotyczyć pytanie lub jeżeli pytanie dotyczy konkretnego produktu o podanej nazwie podaj jego nazwę.
+Jeżeli pytanie dotyczy znalezienia produktu kompatybilnego z innym produktem podaj typ szukanego produktu i nazwę, EAN lub Part number produktu, z którym ma być kompatybilny.
 Odpowiedz w formacie json:
 {{"types": ["lodówki", "tablety"]}}
 lub
 {{"name": "Nazwa produktu"}}
 lub jeżeli użytkownik podał kilka produktów:
 {{"products": [{{"name": "Nazwa produktu X"}}, {{"EAN": "EAN produktu Y"}}, {{"PN": "Part number produktu Z"}}, ...] }}
+lub jeżeli dotyczy kompatybilności:
+{{"types": ["komputery", "laptopy"], "compatible_with": {{"name": "Nazwa produktu", "EAN": "EAN produktu", "PN": "Part number produktu"}} }}
+
 
 Przykłady:
 Pytanie: Telefon z systemem iOS
@@ -412,6 +416,15 @@ Pytanie: iPhone 15, Samsung S24, Xiaomi 15
 Odpowiedź: {{"products": [{{"name": "iPhone 15"}}, {{"name": "Samsung S24"}}, {{"name": "Xiaomi 15"}}] }}
 Pytanie: 1234567890123, 0987654321098
 Odpowiedź: {{"products": [{{"EAN": "1234567890123"}}, {{"EAN": "0987654321098"}}] }}
+Pytanie: Karta pamięci do Samsung Galaxy S21
+Odpowiedź: {{"types": ["karty pamięci"], "compatible_with": {{"name": "Samsung Galaxy S21"}} }}
+Pytanie: Tani procesor do płyty głównej o part number 90DD02H0-M09000
+Odpowiedź: {{"types": ["procesory"], "compatible_with": {{"PN": "90DD02H0-M09000"}} }}
+Pytanie: Dysk SSD 512GB do laptopa Dell XPS 13
+Odpowiedź: {{"types": ["dyski SSD"], "compatible_with": {{"name": "Dell XPS 13"}} }}
+Pytanie: pamięć RAM 16GB do laptopa 0987654321098
+Odpowiedź: {{"types": ["pamięci RAM"], "compatible_with": {{"EAN": "0987654321098"}} }}
+
 
 Pytanie użytkownika:
 {user_query}
@@ -559,9 +572,33 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         }
 
     types_query = user_query
-    # if "compatible_with" in data:
-    #     logger.info(f"Kompatybilność z produktem: {data['compatible_with']}")
-    #     compatibility_search(data)
+    if "compatible_with" in data:
+        try:
+            start = time.time()
+            types_response = app.ctx.NEO4J.get_similar_types(types_query)
+            types = [t["type_code"] for t in types_response]
+            logger.debug(types)
+            data["types"] = types
+            end = time.time()
+            logger.info(f"Wyszukiwanie typów produktów: {end - start} s")
+            times["Wyszukiwanie typów produktów"] = end - start
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Błąd podczas wyszukiwania typów produktów: {str(e)}",
+                "times": times,
+                "time": sum(times.values())
+            }
+        logger.info(f"Kompatybilność z produktem: {data['compatible_with']}")
+        compatibility_response = compatibility_search(data)
+        return {
+            "success": True,
+            "search_type": "compatibility",
+            "compatible_with": data["compatible_with"],
+            "results": compatibility_response,
+            "times": times,
+            "time": sum(times.values())
+        }
     if "types" in data:
         types = data["types"]
         if not types:
@@ -799,6 +836,28 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
 
 def type_to_label(t: str):
     return t.replace("-", "_")
+
+
+def compatibility_search(data):
+    logger.debug(data)
+    app = Sanic.get_app()
+    types = data.get("types", [])
+    compatible_with = data.get("compatible_with", {})
+    ean = ""
+    if compatible_with.get("EAN"):
+        ean = compatible_with["EAN"]
+        response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
+        logger.debug(response)
+        return response
+    elif compatible_with.get("name"):
+        name = compatible_with["name"]
+    elif compatible_with.get("PN"):
+        pn = compatible_with["PN"]
+        response = app.ctx.NEO4J.get_compatible_products(types=types, pn=pn)
+        logger.debug(response)
+        return response
+    else:
+        logger.error("Brak informacji o kompatybilności w danych wejściowych")
 
 
 def simple_search(user_query):
