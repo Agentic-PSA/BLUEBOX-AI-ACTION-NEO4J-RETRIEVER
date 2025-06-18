@@ -391,6 +391,7 @@ def get_embedding(text, model="text-embedding-3-small"):
 def analize_query(user_query):
     prompt = f'''
 Użytkownik może szukać produktów podając jego parametry lub szukać jednego lub kilku konkretnych produktów podając nazwy, numery EAN lub Part number.
+Jeżeli dla jednego produktu została podana zarówno nazwa jak i EAN lub Part number to podaj tylko jedną z tych wartości z priorytetem: EAN > PN > name.
 Określ jakich typów produktów może dotyczyć pytanie lub jeżeli pytanie dotyczy konkretnego produktu o podanej nazwie podaj jego nazwę.
 Jeżeli pytanie dotyczy znalezienia produktu kompatybilnego z innym produktem podaj typ szukanego produktu i nazwę, EAN lub Part number produktu, z którym ma być kompatybilny.
 Odpowiedz w formacie json:
@@ -414,6 +415,8 @@ Pytanie: Router Mikrotik RB4011iGS+RM
 Odpowiedź: {{"name": "Router Mikrotik RB4011iGS+RM"}}
 Pytanie: iPhone 15, Samsung S24, Xiaomi 15
 Odpowiedź: {{"products": [{{"name": "iPhone 15"}}, {{"name": "Samsung S24"}}, {{"name": "Xiaomi 15"}}] }}
+Pytanie: iPhone 15 12345678901234, Samsung S24 0987654321098, Xiaomi 15 1122334455667
+Odpowiedź: {{"products": [{{"EAN": "12345678901234"}}, {{"EAN": "0987654321098"}}, {{"EAN": "1122334455667"}}] }}
 Pytanie: 1234567890123, 0987654321098
 Odpowiedź: {{"products": [{{"EAN": "1234567890123"}}, {{"EAN": "0987654321098"}}] }}
 Pytanie: Karta pamięci do Samsung Galaxy S21

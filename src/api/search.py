@@ -19,6 +19,7 @@ class Search(HTTPMethodView):
             return JSONResponse(body=form.errors, status=400)
         query = form.cleaned_data['query']
         query = re.sub(r'(?<!\\)"', r'\"', query)
+        query = query.replace("::", ":")
         parameters = form.cleaned_data.get('parameters', False)
         logger.debug(f"parameters: {parameters}")
         ai_answer = form.cleaned_data.get('ai', False)

@@ -18,6 +18,7 @@ class SimpleSearch(HTTPMethodView):
             return JSONResponse(body=form.errors, status=400)
         query = form.cleaned_data['query']
         query = re.sub(r'(?<!\\)"', r'\"', query)
+        query = query.replace("::", ":")
 
         response = simple_search(query)
         if not response:
