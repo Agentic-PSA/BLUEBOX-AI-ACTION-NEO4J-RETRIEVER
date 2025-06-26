@@ -6,6 +6,8 @@ from sanic.response import JSONResponse
 from collections import OrderedDict
 
 from .forms.add_product import AddProductForm
+from ..services.cypher_search import get_embedding
+
 
 class AddProduct(HTTPMethodView):
     @staticmethod
@@ -29,6 +31,8 @@ class AddProduct(HTTPMethodView):
         if 'common' in properties:
             if isinstance(properties['common'], dict):
                 main_node_properties['name'] = properties['common'].get('Nazwa', '')
+                if properties['common'].get('Nazwa'):
+                    main_node_properties['nameEmbedding'] = get_embedding(properties['common']['Nazwa'])
                 main_node_properties['product_number'] = properties['common'].get('Product number', '')
                 main_node_properties['producer'] = properties['common'].get('Producent', '')
 
@@ -43,9 +47,20 @@ class AddProduct(HTTPMethodView):
                 if not isinstance(section, dict):
                     continue
                 section_name = section.get('section_name', '')
+                section_sort = section.get('section_sort', 0)
                 section_attributes = section.get('attributes', {})
+                attributes_types = section.get('attributes_types', {})
+                i = 0
                 for attribute, value in section_attributes.items():
-                    relationship_properties = {'section_name': section_name}
+                    i += 1
+                    attribute_sort = i
+                    attribute_type = attributes_types.get(attribute, '')
+                    relationship_properties = {
+                        'section_name': section_name,
+                        'section_sort': section_sort,
+                        'attribute_sort': attribute_sort,
+                        'attribute_type': attribute_type
+                    }
                     response = request.app.ctx.NEO4J.add_property_node(product_node, attribute, value,
                                                                        f"Property_{language_key}",
                                                                        relationship_properties)
