@@ -21,7 +21,7 @@ units_variants = {
 
 }
 
-bytes_units = ["bit", "kbit", "Mbit", "Gbit", "b", "kb", "Mb", "Gb", "kB", "MB", "GB", "PB"]
+bytes_units = ["bit", "kbit", "Mbit", "Gbit", "b", "kb", "Mb", "Gb", "kB", "MB", "GB", "TB", "PB"]
 bytes_per_s_units = ["bit/s", "kbit/s", "Mbit/s", "Gbit/s", "b/s", "kb/s", "Mb/s", "Gb/s", "B/s", "kB/s", "MB/s", "GB/s", "TB/s"]
 pixel_units = ["px", "pixel", "pixels"]
 

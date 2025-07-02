@@ -18,8 +18,8 @@ import src.services.db_schema
 #     api_key="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",
 #     # This is the default and can be omitted
 # )
-uri = "neo4j://172.19.3.220:30687"
-driver = GraphDatabase.driver(uri, auth=("neo4j", "testpassword"))
+uri = f"neo4j://{os.environ.get("NEO4J_HOST")}:{os.environ.get("NEO4J_PORT")}"
+driver = GraphDatabase.driver(uri, auth=(os.environ.get("NEO4J_USER"), os.environ.get("NEO4J_PASSWORD")))
 
 client_gpt = openai.OpenAI(
    api_key="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")

@@ -54,7 +54,7 @@ class SpiffConnector:
         connection = self.connect()
         try:
             records = self.execute_query(connection, query)
-            return records
+            return [r[0] for r in records]
         finally:
             self.close_connection(connection)
 
@@ -99,7 +99,7 @@ class SpiffConnector:
         connection = self.connect()
         try:
             records = self.execute_query(connection, query)
-            return records
+            return records[0][1] if records else None
         finally:
             self.close_connection(connection)
 
