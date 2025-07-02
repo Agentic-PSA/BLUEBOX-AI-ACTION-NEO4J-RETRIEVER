@@ -870,7 +870,7 @@ def compatibility_search(data):
         ean = compatible_with["EAN"]
     else:
         logger.error("Brak informacji o kompatybilności w danych wejściowych")
-        return []
+        return [], []
     logger.info(f"EAN: {ean}")
     response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
     logger.debug(response)
