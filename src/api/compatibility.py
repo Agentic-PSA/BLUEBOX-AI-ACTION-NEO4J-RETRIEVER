@@ -68,8 +68,15 @@ class Compatibility(HTTPMethodView):
         elif form.cleaned_data.get("product_compatibility"):
             ean1 = form.cleaned_data.get("ean1", '')
             ean2 = form.cleaned_data.get("ean2", '')
+            grounds = {"grounds": form.cleaned_data.get("grounds", '')}
             product_compatibility = form.cleaned_data["product_compatibility"].upper()
-            response = request.app.ctx.NEO4J.add_products_bidirectional_relationship_with_properties(ean1, ean2, product_compatibility)
+            response = request.app.ctx.NEO4J.add_products_bidirectional_relationship_with_properties(
+                ean1=ean1,
+                ean2=ean2,
+                product_compatibility=product_compatibility,
+                relationship_properties1=grounds,
+                relationship_properties2=grounds
+            )
             return JSONResponse(body={})
 
         else:
