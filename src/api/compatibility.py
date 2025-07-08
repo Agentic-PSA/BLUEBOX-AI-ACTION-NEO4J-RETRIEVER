@@ -73,7 +73,7 @@ class Compatibility(HTTPMethodView):
             response = request.app.ctx.NEO4J.add_products_bidirectional_relationship_with_properties(
                 ean1=ean1,
                 ean2=ean2,
-                product_compatibility=product_compatibility,
+                relationship_type=product_compatibility,
                 relationship_properties1=grounds,
                 relationship_properties2=grounds
             )
