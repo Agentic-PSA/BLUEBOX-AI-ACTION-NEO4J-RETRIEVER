@@ -608,9 +608,76 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 "times": times,
                 "time": sum(times.values())
             }
+
+        try:
+            start = time.time()
+            specifications = {}
+            for t in types:
+                # print(f"Pobieranie specyfikacji dla typu: {t}")
+                specification = src.services.product_specification.get_product_specification(t)
+                if specification:
+                    specification = src.services.product_specification.filter_language(specification, "PL")
+                    specifications[type_to_label(t)] = specification
+            end = time.time()
+            logger.info(f"Pobieranie specyfikacji: {end - start} s")
+            times["Pobieranie specyfikacji"] = end - start
+            logger.info(specifications)
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Błąd podczas pobierania specyfikacji produktów: {str(e)}",
+                "times": times,
+                "types": types_response,
+                "time": sum(times.values())
+            }
+
+        try:
+            start = time.time()
+            params = generate_params(user_query, specifications, types)
+            end = time.time()
+            logger.info(f"Generowanie parametrów cypher: {end - start} s")
+            times["Generowanie parametrów cypher"] = end - start
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Błąd podczas generowania parametrów Cypher: {str(e)}",
+                "times": times,
+                "types": types_response,
+                "time": sum(times.values())
+            }
+        start = time.time()
+        params_values = get_params_values(params, types)
+        end = time.time()
+        logger.info(f"Znalezienie możliwych wartości parametrów: {end - start} s")
+        times["Znalezienie możliwych wartości parametrów"] = end - start
+        logger.info(params_values)
+
+        if params_values:
+            incorrect_params = get_incorrect_params(params, params_values)
+            logger.info(f"incorrect_params: {incorrect_params}")
+            if incorrect_params:
+                original_params = params
+                start = time.time()
+                corrected_params = correct_generated_params(incorrect_params, params_values, user_query)
+                logger.info(f"corrected_params: {corrected_params}")
+                corrected_params_dict = {}
+                for param in corrected_params:
+                    corrected_params_dict[param.get("name")] = param.get("value")
+                for param in params.get('requiredProperties', []):
+                    if param.get('name') in corrected_params_dict:
+                        param['value'] = corrected_params_dict[param.get('name')]
+                end = time.time()
+                logger.info(f"Poprawienie parametrów: {end - start} s")
+                times["Poprawienie parametrów"] = end - start
+                logger.info(params)
+
+        # dodanie informacji o typach, które pyta cypher
+        params["productTypes"] = types
+
+
         logger.info(f"Kompatybilność z produktem: {data['compatible_with']}")
         start = time.time()
-        compatibility_response, types = compatibility_search(data)
+        compatibility_response, types = compatibility_search(data, params)
         end = time.time()
         logger.info(f"Wyszukiwanie kompatybilnych produktów: {end - start} s")
         times["Wyszukiwanie kompatybilnych produktów"] = end - start
@@ -862,7 +929,7 @@ def type_to_label(t: str):
     return t.replace("-", "_")
 
 
-def compatibility_search(data):
+def compatibility_search(data, params=None):
     logger.debug(data)
     app = Sanic.get_app()
     types = data.get("types", [])
@@ -888,7 +955,10 @@ def compatibility_search(data):
         logger.error("Brak informacji o kompatybilności w danych wejściowych")
         return [], []
     logger.info(f"EAN: {ean}")
-    response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
+    if params:
+        response = app.ctx.NEO4J.get_filtered_compatible_products(types=types, ean=ean, params=params)
+    else:
+        response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
     logger.debug(response)
     return response, types
 
