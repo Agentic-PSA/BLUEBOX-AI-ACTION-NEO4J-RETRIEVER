@@ -592,6 +592,22 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 "times": times,
                 "time": sum(times.values())
             }
+        try:
+            start = time.time()
+            types = filter_types(user_query, types_response).get("types", [])
+            types = [type_to_label(t) for t in types]
+            data["types"] = types
+            end = time.time()
+            logger.debug(data)
+            logger.info(f"Filtrowanie typów produktów: {end - start} s")
+            times["Filtrowanie typów produktów"] = end - start
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Błąd podczas filtrowania typów: {str(e)}",
+                "times": times,
+                "time": sum(times.values())
+            }
         logger.info(f"Kompatybilność z produktem: {data['compatible_with']}")
         start = time.time()
         compatibility_response, types = compatibility_search(data)
