@@ -403,6 +403,10 @@ RETURN
                     "pn": pn,
                     "labels": labels,
                     "currency": currency,
+                    "equal": price.get("equal"),
+                    "min": price.get("min"),
+                    "max": price.get("max"),
+                    "requiredProperties": params.get("requiredProperties")
                 }
                 if price:
                     if price.get("equal") is not None:
@@ -416,6 +420,8 @@ RETURN
                 logger.debug(result)
                 if result:
                     return result[0][1]
+
+        return None
 
     def get_product_price(self, action_code: str, currency: str):
         with self.get_neo4j_session() as session:
