@@ -467,23 +467,31 @@ RETURN
                 return None
 
             query = """
-                    MATCH (prod:Product{EAN: $ean})
+                    MATCH (prod:Product {EAN: $ean})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
                     WHERE prop.default_unit IS NULL OR prop.default_unit = true
                     WITH prod, 
-                        collect({
-                          name: prop.name,
-                          value: prop.value,
-                          unit: prop.unit,
-                          section: r.section_name
-                        }) as properties
+                         collect({
+                           name: prop.name,
+                           value: prop.value,
+                           unit: prop.unit,
+                           section: r.section_name,
+                           section_sort: r.section_sort,
+                           attribute_sort: r.attribute_sort
+                         }) as properties
+                    WITH prod, 
+                         [x IN properties | x] AS props
+                    UNWIND props AS p
+                    WITH prod, p
+                    ORDER BY p.section_sort ASC, p.attribute_sort ASC
+                    WITH prod, collect(p) AS sorted_properties
                     RETURN {
                       EAN: prod.EAN,
                       name: prod.name,
                       producer: prod.producer,
                       action: prod.action,
                       product_number: prod.product_number,
-                      properties: properties
+                      properties: sorted_properties
                     } as product
                     """
             properties = {"ean": ean_in_db}
@@ -510,24 +518,35 @@ RETURN
                 ean = result.get("EAN", "")
                 logger.debug(f"ean: {ean}")
                 query = """
-                                MATCH (prod:Product{EAN: $ean})
-                                OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
-                                WHERE prop.default_unit IS NULL OR prop.default_unit = true
-                                WITH prod, 
-                                    collect({
-                                      name: prop.name,
-                                      value: prop.value,
-                                      unit: prop.unit,
-                                      section: r.section_name
-                                    }) as properties
-                                RETURN {
-                                  EAN: prod.EAN,
-                                  name: prod.name,
-                                  producer: prod.producer,
-                                  action: prod.action,
-                                  product_number: prod.product_number,
-                                  properties: properties
-                                } as product
+                    MATCH (prod:Product {EAN: $ean})
+                    OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+                    WHERE prop.default_unit IS NULL OR prop.default_unit = true
+                    WITH prod, 
+                         collect({
+                           name: prop.name,
+                           value: prop.value,
+                           unit: prop.unit,
+                           section: r.section_name,
+                           section_sort: r.section_sort,
+                           attribute_sort: r.attribute_sort
+                         }) as properties
+                    UNWIND properties AS p
+                    WITH prod, p
+                    ORDER BY p.section_sort ASC, p.attribute_sort ASC
+                    WITH prod, collect({
+                      name: p.name,
+                      value: p.value,
+                      unit: p.unit,
+                      section: p.section
+                    }) AS sorted_properties
+                    RETURN {
+                      EAN: prod.EAN,
+                      name: prod.name,
+                      producer: prod.producer,
+                      action: prod.action,
+                      product_number: prod.product_number,
+                      properties: sorted_properties
+                    } AS product
                                 """
                 properties = {"ean": ean}
                 result_with_properties = session.execute_read(self._execute_query, query, properties)
@@ -591,24 +610,35 @@ RETURN
                 ean = result.get("EAN", "")
                 logger.debug(f"ean: {ean}")
                 query = """
-                    MATCH (prod:Product{EAN: $ean})
+                    MATCH (prod:Product {EAN: $ean})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
                     WHERE prop.default_unit IS NULL OR prop.default_unit = true
                     WITH prod, 
-                        collect({
-                          name: prop.name,
-                          value: prop.value,
-                          unit: prop.unit,
-                          section: r.section_name
-                        }) as properties
+                         collect({
+                           name: prop.name,
+                           value: prop.value,
+                           unit: prop.unit,
+                           section: r.section_name,
+                           section_sort: r.section_sort,
+                           attribute_sort: r.attribute_sort
+                         }) as properties
+                    UNWIND properties AS p
+                    WITH prod, p
+                    ORDER BY p.section_sort ASC, p.attribute_sort ASC
+                    WITH prod, collect({
+                      name: p.name,
+                      value: p.value,
+                      unit: p.unit,
+                      section: p.section
+                    }) AS sorted_properties
                     RETURN {
                       EAN: prod.EAN,
                       name: prod.name,
                       producer: prod.producer,
                       action: prod.action,
                       product_number: prod.product_number,
-                      properties: properties
-                    } as product
+                      properties: sorted_properties
+                    } AS product
                     """
                 properties = {"ean": ean}
                 result_with_properties = session.execute_read(self._execute_query, query, properties)
@@ -633,23 +663,31 @@ RETURN
                 ean = result.get("EAN", "")
                 logger.debug(f"ean: {ean}")
                 query = """
-                    MATCH (prod:Product{EAN: $ean})
+                    MATCH (prod:Product {EAN: $ean})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
                     WHERE prop.default_unit IS NULL OR prop.default_unit = true
                     WITH prod, 
-                        collect({
-                          name: prop.name,
-                          value: prop.value,
-                          unit: prop.unit,
-                          section: r.section_name
-                        }) as properties
+                         collect({
+                           name: prop.name,
+                           value: prop.value,
+                           unit: prop.unit,
+                           section: r.section_name,
+                           section_sort: r.section_sort,
+                           attribute_sort: r.attribute_sort
+                         }) as properties
+                    WITH prod, 
+                         [x IN properties | x] AS props
+                    UNWIND props AS p
+                    WITH prod, p
+                    ORDER BY p.section_sort ASC, p.attribute_sort ASC
+                    WITH prod, collect(p) AS sorted_properties
                     RETURN {
                       EAN: prod.EAN,
                       name: prod.name,
                       producer: prod.producer,
                       action: prod.action,
                       product_number: prod.product_number,
-                      properties: properties
+                      properties: sorted_properties
                     } as product
                     """
                 properties = {"ean": ean}
@@ -764,24 +802,34 @@ RETURN
     def get_products_with_parameters(self, skip=0, limit=100, type=None):
         label = type if type else "Product"
         query = f"""
-        MATCH (prod:{label})
-        OPTIONAL MATCH (prod)-[:HAS]->(prop:Property_PL)
-        WITH prod, 
-            collect({{
-              name: prop.name,
-              value: prop.value,
-              unit: prop.unit
-            }}) as properties
-        RETURN {{
-          EAN: prod.EAN,
-          name: prod.name,
-          producer: prod.producer,
-          action: prod.action,
-          product_number: prod.product_number,
-          properties: properties
-        }} as product
-        SKIP $skip
-        LIMIT $limit
+            MATCH (prod:{label})
+            OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+            WITH prod, 
+                 collect({{
+                   name: prop.name,
+                   value: prop.value,
+                   unit: prop.unit,
+                   section_sort: r.section_sort,
+                   attribute_sort: r.attribute_sort
+                 }}) as properties
+            UNWIND properties AS p
+            WITH prod, p
+            ORDER BY p.section_sort ASC, p.attribute_sort ASC
+            WITH prod, collect({{
+              name: p.name,
+              value: p.value,
+              unit: p.unit
+            }}) AS sorted_properties
+            RETURN {{
+              EAN: prod.EAN,
+              name: prod.name,
+              producer: prod.producer,
+              action: prod.action,
+              product_number: prod.product_number,
+              properties: sorted_properties
+            }} AS product
+            SKIP $skip
+            LIMIT $limit
         """
 
         with self.driver.session() as session:
