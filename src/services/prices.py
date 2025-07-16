@@ -1,3 +1,5 @@
+import os
+
 import requests
 
 from src import Neo4jConnector
@@ -66,6 +68,12 @@ class Prices:
             print(f"{currency} rate: {rate}")
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    print(os.environ.get("NEO4J_PORT"))
+
     prices = Prices()
-    # prices.actualize_prices()
-    prices.get_exchangerates()
+    prices.actualize_prices()
+
+    # prices.get_exchangerates()
