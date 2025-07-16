@@ -19,6 +19,17 @@ def find_products_fulltext(tx, name, n = 10, similarity = None):
     return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
 
+def find_products_fulltext_by_pn(tx, pn, similarity = 0.98):
+    query = f"CALL db.index.fulltext.queryNodes('product_number_text', $pn) yield node as p, score AS similarity "
+    if similarity:
+        query += f"WITH p, similarity WHERE similarity >= {similarity} "
+    query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
+    query += f"LIMIT 1"
+    pn = re.sub(r'(?<!/)/(?!/)', '//', pn)
+    result = tx.run(query, pn=pn)
+    return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
+             "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
+
 def find_similar_products(tx, query_vector, n = 10, similarity = None):
     query = f"CALL db.index.vector.queryNodes('name', {n}, $query_vector) yield node as p, score AS similarity "
     if similarity:
@@ -553,7 +564,7 @@ RETURN
                 results_with_properties.append(result_with_properties[0])
             return results_with_properties
 
-    def get_product_by_pn(self, pn: str, with_parameters=False):
+    def get_product_by_pn_vector(self, pn: str, with_parameters=False):
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=pn
@@ -593,6 +604,52 @@ RETURN
                 result_with_properties = session.execute_read(self._execute_query, query, properties)
                 results_with_properties.append(result_with_properties[0])
             return results_with_properties
+
+    def get_product_by_pn(self, pn: str, with_parameters=False):
+        pn = re.sub(r'(?<!\\)"', r'\"', pn)
+        with self.driver.session() as session:
+            results = session.read_transaction(find_products_fulltext_by_pn, pn)
+            logger.debug(results)
+            if not with_parameters:
+                return results
+
+            results_with_properties = []
+            for result in results:
+                ean = result.get("EAN", "")
+                logger.debug(f"ean: {ean}")
+                query = """
+                    MATCH (prod:Product {EAN: $ean})
+                    OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
+                    WHERE prop.default_unit IS NULL OR prop.default_unit = true
+                    WITH prod, 
+                         collect({
+                           name: prop.name,
+                           value: prop.value,
+                           unit: prop.unit,
+                           section: r.section_name,
+                           section_sort: r.section_sort,
+                           attribute_sort: r.attribute_sort
+                         }) as properties
+                    WITH prod, 
+                         [x IN properties | x] AS props
+                    UNWIND props AS p
+                    WITH prod, p
+                    ORDER BY p.section_sort ASC, p.attribute_sort ASC
+                    WITH prod, collect(p) AS sorted_properties
+                    RETURN {
+                      EAN: prod.EAN,
+                      name: prod.name,
+                      producer: prod.producer,
+                      action: prod.action,
+                      product_number: prod.product_number,
+                      properties: sorted_properties
+                    } as product
+                    """
+                properties = {"ean": ean}
+                result_with_properties = session.execute_read(self._execute_query, query, properties)
+                results_with_properties.append(result_with_properties[0])
+            return results_with_properties
+
 
     def get_product_by_name_vector(self, name:str, n = 10, with_parameters=False, similarity = None):
         response = self.client_gpt.embeddings.create(

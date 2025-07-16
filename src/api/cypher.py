@@ -9,9 +9,10 @@ class Cypher(HTTPMethodView):
     async def post(request: Request) -> JSONResponse:
         cypher = request.json.get("cypher", '')
         parameters = request.json.get("parameters", {})
+        logging.info(cypher)
+        logging.info(parameters)
         response = request.app.ctx.NEO4J.execute_query(cypher, parameters)
-        print(str(response)[:100])
-        print(type(response))
+
 
         return JSONResponse(body=response)
 

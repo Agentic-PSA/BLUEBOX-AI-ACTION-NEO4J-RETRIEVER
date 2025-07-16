@@ -23,15 +23,17 @@ class Units(HTTPMethodView):
             match = re.search(r'(\d+(?:\.\d+)?)(\")?', value)
             if match and match.group(2) == '"':
                 value = value.replace('"', ' in', 1)
-
-            q = Units.Q_(value)
-            v = q.m
-            u = q.u
-            logging.debug(f"Processing {key}: value = {v}, unit = {u}")
-            response[key] = {
-                'value': v,
-                'unit': f"{u:~}"
-            }
+            try:
+                q = Units.Q_(value)
+                v = q.m
+                u = q.u
+                logging.debug(f"Processing {key}: value = {v}, unit = {u}")
+                response[key] = {
+                    'value': v,
+                    'unit': f"{u:~}"
+                }
+            except Exception as e:
+                logging.warning(f"Error processing {key}: {e}")
 
 
         return JSONResponse(body=response)
