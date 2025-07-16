@@ -459,10 +459,13 @@ def check_ean(text):
 
 def check_pn(text):
     app = Sanic.get_app()
-    response = app.ctx.NEO4J.get_product_by_pn(text)
-    for record in response:
-        if record.get('similarity', 0) >= 0.98:
-            return record
+    try:
+        response = app.ctx.NEO4J.get_product_by_pn(text)
+        for record in response:
+            if record.get('similarity', 0) >= 0.98:
+                return record
+    except Exception as e:
+        logger.warning(f"PN check error: {str(e)}")
     return None
 
 def is_action_code(text):
