@@ -356,7 +356,7 @@ RETURN
                 if result:
                     return result[0][1]
 
-    def get_filtered_compatible_products(self, types=[], params={}, ean=None, pn=None):
+    def get_compatible_products_filtered_by_price(self, types=[], params={}, ean=None, pn=None):
         if not types:
             return []
         if ean:
@@ -387,9 +387,8 @@ RETURN
         labels = [type.replace("-", "_") for type in types]
         logger.debug(f"Labels: {labels}")
         variants = self.generate_ean_variants(ean) if ean else [pn]
-
-        for ean_variant in variants:
-            with self.get_neo4j_session() as session:
+        with self.get_neo4j_session() as session:
+            for ean_variant in variants:
                 query = (
                     f"MATCH (product:Product{product_query}) "
                     "OPTIONAL MATCH (product)-[:COMPATIBLE]-(other:Product) "
@@ -414,9 +413,6 @@ RETURN
                     "pn": pn,
                     "labels": labels,
                     "currency": currency,
-                    "equal": price.get("equal"),
-                    "min": price.get("min"),
-                    "max": price.get("max"),
                     "requiredProperties": params.get("requiredProperties")
                 }
                 if price:
@@ -433,6 +429,54 @@ RETURN
                     return result[0][1]
 
         return None
+
+    def filter_compatible_products(self, eans=[], params={}):
+        logger.info(eans)
+        logger.info(params)
+        query = """
+        MATCH (product:Product)
+        WHERE product.EAN IN $eans 
+        OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL) 
+        WITH product, collect({
+  name: prop.name,
+  value: prop.value,
+  unit: prop.unit
+}) as properties
+WHERE size([reqProp IN $requiredProperties WHERE
+  size([prop IN properties WHERE
+    prop.name = reqProp.name AND
+    (
+      (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toLower(toString(prop.value)) IN reqProp.value) OR
+      (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
+      (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
+      (reqProp.condition = '<' AND prop.value < reqProp.value) OR
+      (reqProp.condition = '>' AND prop.value > reqProp.value) OR
+      (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
+      (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
+      ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
+      ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
+    ) AND
+    (reqProp.unit IS NULL OR prop.unit = reqProp.unit)
+  ]) > 0
+]) = size($requiredProperties)
+RETURN product
+                """
+        properties = {
+            "eans": eans,
+            "requiredProperties": params.get("requiredProperties")
+        }
+        with self.get_neo4j_session() as session:
+            filtered_nodes =  session.run(query, properties)
+            logger.info("filtered_nodes")
+            logger.info(filtered_nodes)
+            records = list(filtered_nodes)
+            filtered_nodes = [record.data().get("product", {}) for record in records]
+            for record in filtered_nodes:
+                if record.get("nameEmbedding"):
+                    del record["nameEmbedding"]
+                if record.get("productNumberEmbedding"):
+                    del record["productNumberEmbedding"]
+            return filtered_nodes
 
     def get_product_price(self, action_code: str, currency: str):
         with self.get_neo4j_session() as session:

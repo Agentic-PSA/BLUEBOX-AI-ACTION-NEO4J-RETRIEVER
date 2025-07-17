@@ -260,6 +260,7 @@ Znak warunku <> oznacza różny i działa też dla napisów.
 Jeżeli użytkownik podał przedział wartości parametru zapisz go jako dwa oddzielne warunki używając odpowiednich znaków nierówności.
 Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
 Jeżeli użytkownik podał tylko jedną wartość dla danego parametru podaj tą wartość w value.
+Nie podawaj parametrów dotyczących kompatybilności z innymi produktami!
 Pytanie użytkownika:
 {question}
 
@@ -959,7 +960,12 @@ def compatibility_search(data, params=None):
         return [], []
     logger.info(f"EAN: {ean}")
     if params:
-        response = app.ctx.NEO4J.get_filtered_compatible_products(types=types, ean=ean, params=params)
+        response = app.ctx.NEO4J.get_compatible_products_filtered_by_price(types=types, ean=ean, params=params)
+        eans = [cp['EAN'] for cp in response if cp.get('EAN')]
+        logger.info(f"EANs: {eans}")
+        if eans and params.get("requiredProperties"):
+            response = app.ctx.NEO4J.filter_compatible_products(eans=eans, params=params)
+
     else:
         response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
     logger.debug(response)
