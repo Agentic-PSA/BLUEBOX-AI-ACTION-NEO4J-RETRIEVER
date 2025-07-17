@@ -359,6 +359,7 @@ WHERE size([reqProp IN $requiredProperties WHERE
       (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
       (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
       ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
+      ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'INTEGER' AND apoc.meta.cypher.type(prop.value) = 'STRING' AND prop.value STARTS WITH toString(reqProp.value)) OR
       ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
     ) AND
     (reqProp.unit IS NULL OR prop.unit = reqProp.unit)
