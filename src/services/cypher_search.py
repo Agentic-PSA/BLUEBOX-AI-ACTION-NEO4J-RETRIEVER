@@ -560,6 +560,15 @@ Odpowiedz w formacie JSON:
     return data.get('answer')
 
 
+def filter_none_params(params_values):
+    if 'requiredProperties' in params_values:
+        params_values['requiredProperties'] = [
+            param for param in params_values['requiredProperties']
+            if not ('value' in param and param['value'] is None)
+        ]
+    return params_values
+
+
 def cypher_search(user_query, return_parameters=False, ai_answer=False):
     times = {}
     app = Sanic.get_app()
@@ -639,6 +648,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         try:
             start = time.time()
             params = generate_params(user_query, specifications, types)
+            params = filter_none_params(params)
             end = time.time()
             logger.info(f"Generowanie parametrów cypher: {end - start} s")
             times["Generowanie parametrów cypher"] = end - start
@@ -675,9 +685,6 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 logger.info(f"Poprawienie parametrów: {end - start} s")
                 times["Poprawienie parametrów"] = end - start
                 logger.info(params)
-
-        # dodanie informacji o typach, które pyta cypher
-        params["productTypes"] = types
 
 
         logger.info(f"Kompatybilność z produktem: {data['compatible_with']}")
@@ -962,10 +969,11 @@ def compatibility_search(data, params=None):
     logger.info(f"EAN: {ean}")
     if params:
         response = app.ctx.NEO4J.get_compatible_products_filtered_by_price(types=types, ean=ean, params=params)
-        eans = [cp['EAN'] for cp in response if cp.get('EAN')]
-        logger.info(f"EANs: {eans}")
-        if eans and params.get("requiredProperties"):
-            response = app.ctx.NEO4J.filter_compatible_products(eans=eans, params=params)
+        if response:
+            eans = [cp['EAN'] for cp in response if cp.get('EAN')]
+            logger.info(f"EANs: {eans}")
+            if eans and params.get("requiredProperties"):
+                response = app.ctx.NEO4J.filter_compatible_products(eans=eans, params=params)
 
     else:
         response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
