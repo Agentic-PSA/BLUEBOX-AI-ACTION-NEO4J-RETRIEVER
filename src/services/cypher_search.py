@@ -471,7 +471,7 @@ def check_pn(text):
     return None
 
 def is_action_code(text):
-    return len(text) == 13 and text[9:].isdigit()
+    return len(text) == 13 #and text[9:].isdigit()
 
 def check_action(text):
     app = Sanic.get_app()
@@ -1011,13 +1011,14 @@ def simple_search(user_query):
         action_response = check_action(user_query)
         end = time.time()
         times["Wyszukiwanie Action"] = end - start
-        return {
-            "success": True,
-            "search_type": "action",
-            "results": action_response,
-            "times": times,
-            "time": sum(times.values())
-        }
+        if action_response:
+            return {
+                "success": True,
+                "search_type": "action",
+                "results": action_response,
+                "times": times,
+                "time": sum(times.values())
+            }
 
     start = time.time()
     # Sprawdź PN
