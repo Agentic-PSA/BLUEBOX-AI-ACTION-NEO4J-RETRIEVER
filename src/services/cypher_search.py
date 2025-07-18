@@ -260,7 +260,7 @@ Znak warunku <> oznacza różny i działa też dla napisów.
 Jeżeli użytkownik podał przedział wartości parametru zapisz go jako dwa oddzielne warunki używając odpowiednich znaków nierówności.
 Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
 Jeżeli użytkownik podał tylko jedną wartość dla danego parametru podaj tą wartość w value.
-Nie podawaj parametrów dotyczących kompatybilności z innymi produktami!
+Nie podawaj parametrów dotyczących kompatybilności z innymi produktami! Pomiń parametry jeżeli dotyczą kompatybilności z innymi produktami.
 Pytanie użytkownika:
 {question}
 
@@ -396,6 +396,8 @@ Użytkownik może szukać produktów podając jego parametry lub szukać jednego
 Jeżeli dla jednego produktu została podana zarówno nazwa jak i EAN lub Part number to podaj tylko jedną z tych wartości z priorytetem: EAN > PN > name.
 Określ jakich typów produktów może dotyczyć pytanie lub jeżeli pytanie dotyczy konkretnego produktu o podanej nazwie podaj jego nazwę.
 Jeżeli pytanie dotyczy znalezienia produktu kompatybilnego z innym produktem podaj typ szukanego produktu i nazwę, EAN lub Part number produktu, z którym ma być kompatybilny.
+W pytaniach o kompatybilność określ czy pytanie zawiera parametry szukanego produktu czy tylko typ i produkt, z którym ma być kompatybilny. 
+Jeżeli zawiera parametry to podaj je w polu params jako true, jeżeli podany jest tylko kompatybilny produkt to false.
 Odpowiedz w formacie json:
 {{"types": ["lodówki", "tablety"]}}
 lub
@@ -403,7 +405,7 @@ lub
 lub jeżeli użytkownik podał kilka produktów:
 {{"products": [{{"name": "Nazwa produktu X"}}, {{"EAN": "EAN produktu Y"}}, {{"PN": "Part number produktu Z"}}, ...] }}
 lub jeżeli dotyczy kompatybilności:
-{{"types": ["komputery", "laptopy"], "compatible_with": {{"name": "Nazwa produktu", "EAN": "EAN produktu", "PN": "Part number produktu"}} }}
+{{"types": ["komputery", "laptopy"], "compatible_with": {{"name": "Nazwa produktu", "EAN": "EAN produktu", "PN": "Part number produktu"}} "params":true/false }}
 
 
 Przykłady:
@@ -422,13 +424,13 @@ Odpowiedź: {{"products": [{{"EAN": "12345678901234"}}, {{"EAN": "0987654321098"
 Pytanie: 1234567890123, 0987654321098
 Odpowiedź: {{"products": [{{"EAN": "1234567890123"}}, {{"EAN": "0987654321098"}}] }}
 Pytanie: Karta pamięci do Samsung Galaxy S21
-Odpowiedź: {{"types": ["karty pamięci"], "compatible_with": {{"name": "Samsung Galaxy S21"}} }}
-Pytanie: Tani procesor do płyty głównej o part number 90DD02H0-M09000
-Odpowiedź: {{"types": ["procesory"], "compatible_with": {{"PN": "90DD02H0-M09000"}} }}
+Odpowiedź: {{"types": ["karty pamięci"], "compatible_with": {{"name": "Samsung Galaxy S21"}}, "params": false}}
+Pytanie: Procesor do płyty głównej o part number 90DD02H0-M09000
+Odpowiedź: {{"types": ["procesory"], "compatible_with": {{"PN": "90DD02H0-M09000"}}, "params": false}}
 Pytanie: Dysk SSD 512GB do laptopa Dell XPS 13
-Odpowiedź: {{"types": ["dyski SSD"], "compatible_with": {{"name": "Dell XPS 13"}} }}
+Odpowiedź: {{"types": ["dyski SSD"], "compatible_with": {{"name": "Dell XPS 13"}}, "params": true}}
 Pytanie: pamięć RAM 16GB do laptopa 0987654321098
-Odpowiedź: {{"types": ["pamięci RAM"], "compatible_with": {{"EAN": "0987654321098"}} }}
+Odpowiedź: {{"types": ["pamięci RAM"], "compatible_with": {{"EAN": "0987654321098"}}, "params": true}}
 
 
 Pytanie użytkownika:
@@ -593,6 +595,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     types_query = user_query
     if "compatible_with" in data:
         try:
+            params_search = data.get("params", False)
+            if isinstance(params_search, str):
+                params_search = True if params_search.lower() == "true" else False
             start = time.time()
             types_response = app.ctx.NEO4J.get_similar_types(types_query)
             types = [t["type_code"] for t in types_response]
@@ -647,46 +652,49 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 "time": sum(times.values())
             }
 
-        try:
-            start = time.time()
-            params = generate_params(user_query, specifications, types)
-            params = filter_none_params(params)
-            end = time.time()
-            logger.info(f"Generowanie parametrów cypher: {end - start} s")
-            times["Generowanie parametrów cypher"] = end - start
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Błąd podczas generowania parametrów Cypher: {str(e)}",
-                "times": times,
-                "types": types_response,
-                "time": sum(times.values())
-            }
-        start = time.time()
-        params_values = get_params_values(params, types)
-        end = time.time()
-        logger.info(f"Znalezienie możliwych wartości parametrów: {end - start} s")
-        times["Znalezienie możliwych wartości parametrów"] = end - start
-        logger.info(params_values)
-
-        if params_values:
-            incorrect_params = get_incorrect_params(params, params_values)
-            logger.info(f"incorrect_params: {incorrect_params}")
-            if incorrect_params:
-                original_params = params
+        if params_search:
+            try:
                 start = time.time()
-                corrected_params = correct_generated_params(incorrect_params, params_values, user_query)
-                logger.info(f"corrected_params: {corrected_params}")
-                corrected_params_dict = {}
-                for param in corrected_params:
-                    corrected_params_dict[param.get("name")] = param.get("value")
-                for param in params.get('requiredProperties', []):
-                    if param.get('name') in corrected_params_dict:
-                        param['value'] = corrected_params_dict[param.get('name')]
+                params = generate_params(user_query, specifications, types)
+                params = filter_none_params(params)
                 end = time.time()
-                logger.info(f"Poprawienie parametrów: {end - start} s")
-                times["Poprawienie parametrów"] = end - start
-                logger.info(params)
+                logger.info(f"Generowanie parametrów cypher: {end - start} s")
+                times["Generowanie parametrów cypher"] = end - start
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"Błąd podczas generowania parametrów Cypher: {str(e)}",
+                    "times": times,
+                    "types": types_response,
+                    "time": sum(times.values())
+                }
+            start = time.time()
+            params_values = get_params_values(params, types)
+            end = time.time()
+            logger.info(f"Znalezienie możliwych wartości parametrów: {end - start} s")
+            times["Znalezienie możliwych wartości parametrów"] = end - start
+            logger.info(params_values)
+
+            if params_values:
+                incorrect_params = get_incorrect_params(params, params_values)
+                logger.info(f"incorrect_params: {incorrect_params}")
+                if incorrect_params:
+                    original_params = params
+                    start = time.time()
+                    corrected_params = correct_generated_params(incorrect_params, params_values, user_query)
+                    logger.info(f"corrected_params: {corrected_params}")
+                    corrected_params_dict = {}
+                    for param in corrected_params:
+                        corrected_params_dict[param.get("name")] = param.get("value")
+                    for param in params.get('requiredProperties', []):
+                        if param.get('name') in corrected_params_dict:
+                            param['value'] = corrected_params_dict[param.get('name')]
+                    end = time.time()
+                    logger.info(f"Poprawienie parametrów: {end - start} s")
+                    times["Poprawienie parametrów"] = end - start
+                    logger.info(params)
+        else:
+            params = None
 
 
         logger.info(f"Kompatybilność z produktem: {data['compatible_with']}")
@@ -702,6 +710,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             "results": compatibility_response,
             "types": types,
             "times": times,
+            "params": params,
             "time": sum(times.values())
         }
     if "types" in data:
