@@ -393,9 +393,10 @@ def get_embedding(text, model="text-embedding-3-small"):
 def analize_query(user_query):
     prompt = f'''
 Użytkownik może szukać produktów podając jego parametry lub szukać jednego lub kilku konkretnych produktów podając nazwy, numery EAN lub Part number.
-Jeżeli dla jednego produktu została podana zarówno nazwa jak i EAN lub Part number to podaj tylko jedną z tych wartości z priorytetem: EAN > PN > name.
+Jeżeli dla jednego produktu została podana zarówno nazwa jak i EAN, kod Action lub Part number to podaj tylko jedną z tych wartości z priorytetem: EAN > Kod Action > PN > name.
+Kod Action to 13-znakowy kod identyfikujący produkt. Najczęściej składa się z 9 liter i 4 cyfr, ale może też być inny. Np. zawierać same litery.
 Określ jakich typów produktów może dotyczyć pytanie lub jeżeli pytanie dotyczy konkretnego produktu o podanej nazwie podaj jego nazwę.
-Jeżeli pytanie dotyczy znalezienia produktu kompatybilnego z innym produktem podaj typ szukanego produktu i nazwę, EAN lub Part number produktu, z którym ma być kompatybilny.
+Jeżeli pytanie dotyczy znalezienia produktu kompatybilnego z innym produktem podaj typ szukanego produktu i nazwę, EAN, Kod Action, lub Part number produktu, z którym ma być kompatybilny.
 W pytaniach o kompatybilność określ czy pytanie zawiera parametry szukanego produktu czy tylko typ i produkt, z którym ma być kompatybilny. 
 Jeżeli zawiera parametry to podaj je w polu params jako true, jeżeli podany jest tylko kompatybilny produkt to false.
 Odpowiedz w formacie json:
@@ -405,7 +406,7 @@ lub
 lub jeżeli użytkownik podał kilka produktów:
 {{"products": [{{"name": "Nazwa produktu X"}}, {{"EAN": "EAN produktu Y"}}, {{"PN": "Part number produktu Z"}}, ...] }}
 lub jeżeli dotyczy kompatybilności:
-{{"types": ["komputery", "laptopy"], "compatible_with": {{"name": "Nazwa produktu", "EAN": "EAN produktu", "PN": "Part number produktu"}} "params":true/false }}
+{{"types": ["komputery", "laptopy"], "compatible_with": {{"name": "Nazwa produktu", "EAN": "EAN produktu", "PN": "Part number produktu", "action": "Kod action"}} "params":true/false }}
 
 
 Przykłady:
@@ -747,11 +748,14 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         products = data["products"]
         logger.info(f"Wyszukiwanie produktów: {products}")
         names = []
+        actions = []
         eans = []
         pns = []
         for product in products:
             if "name" in product:
                 names.append(product["name"])
+            if "action" in product:
+                actions.append(product["action"])
             if "EAN" in product:
                 eans.append(product["EAN"])
             if "PN" in product:
@@ -771,6 +775,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             else:
                 ean_response = app.ctx.NEO4J.get_product(ean)
             responses.append(ean_response)
+        for action in actions:
+            action_response = app.ctx.NEO4J.get_product_by_action_code(action, with_parameters=return_parameters)
+            responses.append(action_response)
         for pn in pns:
             pn_response = app.ctx.NEO4J.get_product_by_pn(pn, with_parameters=return_parameters)
             if pn_response:
@@ -956,13 +963,28 @@ def compatibility_search(data, params=None):
     logger.debug(data)
     app = Sanic.get_app()
     types = data.get("types", [])
-    compatible_with = data.get("compatible_with", {})
-    if compatible_with.get("PN"):
-        pn = compatible_with["PN"]
-        response = app.ctx.NEO4J.get_compatible_products(types=types, pn=pn)
-        logger.debug(response)
-        return response, types
     ean = ""
+    compatible_with = data.get("compatible_with", {})
+    if not params:
+        if compatible_with.get("action"):
+            action = compatible_with["action"]
+            response = app.ctx.NEO4J.get_compatible_products(types=types, action=action)
+            logger.debug(response)
+            return response, types
+        if compatible_with.get("PN"):
+            pn = compatible_with["PN"]
+            response = app.ctx.NEO4J.get_compatible_products(types=types, pn=pn)
+            logger.debug(response)
+            return response, types
+        if compatible_with.get("EAN"):
+            ean = compatible_with["EAN"]
+            response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
+            logger.debug(response)
+            return response, types
+
+    ean = None
+    action = None
+    pn = None
     if compatible_with.get("name"):
         name = compatible_with["name"]
         start = time.time()
@@ -974,20 +996,22 @@ def compatibility_search(data, params=None):
         logger.info(f"Wyszukiwanie nazwy: {end - start} s")
     elif compatible_with.get("EAN"):
         ean = compatible_with["EAN"]
+    elif compatible_with.get("action"):
+        action = compatible_with["action"]
+    elif compatible_with.get("PN"):
+        pn = compatible_with["PN"]
     else:
         logger.error("Brak informacji o kompatybilności w danych wejściowych")
         return [], []
     logger.info(f"EAN: {ean}")
-    if params:
-        response = app.ctx.NEO4J.get_compatible_products_filtered_by_price(types=types, ean=ean, params=params)
-        if response:
-            eans = [cp['EAN'] for cp in response if cp.get('EAN')]
-            logger.info(f"EANs: {eans}")
-            if eans and params.get("requiredProperties"):
-                response = app.ctx.NEO4J.filter_compatible_products(eans=eans, params=params)
 
-    else:
-        response = app.ctx.NEO4J.get_compatible_products(types=types, ean=ean)
+    response = app.ctx.NEO4J.get_compatible_products_filtered_by_price(types=types, ean=ean, action=action, pn=pn, params=params)
+    if response:
+        eans = [cp['EAN'] for cp in response if cp.get('EAN')]
+        logger.info(f"EANs: {eans}")
+        if eans and params.get("requiredProperties"):
+            response = app.ctx.NEO4J.filter_compatible_products(eans=eans, params=params)
+
     logger.debug(response)
     return response, types
 

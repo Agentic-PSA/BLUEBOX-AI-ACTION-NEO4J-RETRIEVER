@@ -326,11 +326,13 @@ class Neo4jConnector:
                     return result[0][0]
         return None
 
-    def get_compatible_products(self, types=[], ean=None, pn=None):
+    def get_compatible_products(self, types=[], ean=None, pn=None, action=None):
         if not types:
             return []
         if ean:
             product_query = "{EAN: $ean}"
+        elif action:
+            product_query = "{action: $action}"
         elif pn:
             product_query = "{product_number: $pn}"
         else:
@@ -350,17 +352,19 @@ RETURN
     apoc.map.submap(other, ['EAN', 'name', 'producer', 'product_number', 'action'])
   ) AS compatible_products
   """
-                properties = {"ean": ean_variant, "pn": pn, "labels": labels}
+                properties = {"ean": ean_variant, "pn": pn, "action": action, "labels": labels}
                 result = session.execute_read(self._execute_query_multiple, query, properties)
                 logger.debug(result)
                 if result:
                     return result[0][1]
 
-    def get_compatible_products_filtered_by_price(self, types=[], params={}, ean=None, pn=None):
+    def get_compatible_products_filtered_by_price(self, types=[], params={}, ean=None, pn=None, action=None):
         if not types:
             return []
         if ean:
             product_query = "{EAN: $ean}"
+        elif action:
+            product_query = "{action: $action}"
         elif pn:
             product_query = "{product_number: $pn}"
         else:
