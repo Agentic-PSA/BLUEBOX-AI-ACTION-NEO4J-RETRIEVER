@@ -460,6 +460,8 @@ def check_ean(text):
     return 11 <= len(text) <= 13 and text.isdigit()
 
 def check_pn(text):
+    if len(text) > 20:
+        return None
     app = Sanic.get_app()
     try:
         response = app.ctx.NEO4J.get_product_by_pn(text)
