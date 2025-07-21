@@ -786,6 +786,17 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         logger.info(f"Wyszukiwanie produktów: {end - start} s")
         times["Wyszukiwanie produktów"] = end - start
 
+        #filtrowanie powtórek
+        eans_set = set()
+        filtered_responses = []
+        for response in responses:
+            ean = response.get("EAN", "")
+            if ean in eans_set:
+                continue
+            eans_set.add(ean)
+            filtered_responses.append(response)
+        responses = filtered_responses
+
         if alternative_search:
             start = time.time()
             alternative_search_response = search_index(alternative_search)
