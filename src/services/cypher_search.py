@@ -33,9 +33,9 @@ def llm(prompt):
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"}
     )
-    print(response)
+    logger.debug(response)
     response_text = response.choices[0].message.content
-    print(response_text)
+    logger.debug(response_text)
     return response_text
 
 def search_index(names=[]):
@@ -261,6 +261,13 @@ Jeżeli użytkownik podał przedział wartości parametru zapisz go jako dwa odd
 Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
 Jeżeli użytkownik podał tylko jedną wartość dla danego parametru podaj tą wartość w value.
 Nie podawaj parametrów dotyczących kompatybilności z innymi produktami! Pomiń parametry jeżeli dotyczą kompatybilności z innymi produktami.
+
+Wartości liczbowe mogą być podane z przecinkiem lub kropką, ale w odpowiedzi użyj kropki jako separatora dziesiętnego.
+Przykłady:
+55,3 metrów - value: 55.3 unit: "m"
+0,7 l - value: 0.7 unit: "l"
+1,00009 GWh - value: 1.00009 unit: "GWh"
+
 Pytanie użytkownika:
 {question}
 
@@ -297,13 +304,13 @@ Odpowiedz w formacie json:
     {{
       "name": "property_name4",
       "value": 50,
-      "unit": in
+      "unit": "in"
       "condition": ">="
     }},
     {{
       "name": "property_name4",
-      "value": 80,
-      "unit": in
+      "value": 0.004,
+      "unit": "GWh"
       "condition": "<="
     }},
   ],
@@ -571,6 +578,11 @@ def filter_none_params(params_values):
             param for param in params_values['requiredProperties']
             if not ('value' in param and param['value'] is None)
         ]
+        for param in params_values['requiredProperties']:
+            value = param.get('value')
+            if isinstance(value, list) and len(value) == 1:
+                param['value'] = value[0]
+
     return params_values
 
 
@@ -889,6 +901,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     try:
         start = time.time()
         params = generate_params(user_query, specifications, types)
+        params = filter_none_params(params)
         end = time.time()
         logger.info(f"Generowanie parametrów cypher: {end - start} s")
         times["Generowanie parametrów cypher"] = end - start
