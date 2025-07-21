@@ -404,8 +404,8 @@ Jeżeli dla jednego produktu została podana zarówno nazwa jak i EAN, kod Actio
 Kod Action to 13-znakowy kod identyfikujący produkt. Najczęściej składa się z 9 liter i 4 cyfr, ale może też być inny. Np. zawierać same litery.
 Określ jakich typów produktów może dotyczyć pytanie lub jeżeli pytanie dotyczy konkretnego produktu o podanej nazwie podaj jego nazwę.
 Jeżeli pytanie dotyczy znalezienia produktu kompatybilnego z innym produktem podaj typ szukanego produktu i nazwę, EAN, Kod Action, lub Part number produktu, z którym ma być kompatybilny.
-W pytaniach o kompatybilność określ czy pytanie zawiera parametry szukanego produktu czy tylko typ i produkt, z którym ma być kompatybilny. 
-Jeżeli zawiera parametry to podaj je w polu params jako true, jeżeli podany jest tylko kompatybilny produkt to false.
+W pytaniach o kompatybilność określ czy pytanie zawiera parametry szukanego produktu lub ograniczenia ceny czy tylko typ i produkt, z którym ma być kompatybilny. 
+Jeżeli zawiera parametry lub ograniczenia ceny to podaj pole params jako true, jeżeli podany jest tylko kompatybilny produkt to false.
 Odpowiedz w formacie json:
 {{"types": ["lodówki", "tablety"]}}
 lub
@@ -439,6 +439,8 @@ Pytanie: Dysk SSD 512GB do laptopa Dell XPS 13
 Odpowiedź: {{"types": ["dyski SSD"], "compatible_with": {{"name": "Dell XPS 13"}}, "params": true}}
 Pytanie: pamięć RAM 16GB do laptopa 0987654321098
 Odpowiedź: {{"types": ["pamięci RAM"], "compatible_with": {{"EAN": "0987654321098"}}, "params": true}}
+Pytanie: torba do laptopa 0987654321098 tańcza niż 200zł
+Odpowiedź: {{"types": ["torby do laptopa"], "compatible_with": {{"EAN": "0987654321098"}}, "params": true}}
 
 
 Pytanie użytkownika:

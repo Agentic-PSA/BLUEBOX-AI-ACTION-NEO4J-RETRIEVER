@@ -414,6 +414,7 @@ RETURN
                 logger.info(query)
                 properties = {
                     "ean": ean_variant,
+                    "action": action,
                     "pn": pn,
                     "labels": labels,
                     "currency": currency,
