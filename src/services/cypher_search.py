@@ -791,7 +791,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             responses.append(ean_response)
         for action in actions:
             action_response = app.ctx.NEO4J.get_product_by_action_code(action, with_parameters=return_parameters)
-            responses.append(action_response)
+            if action_response:
+                responses.append(action_response[0])
         for pn in pns:
             pn_response = app.ctx.NEO4J.get_product_by_pn(pn, with_parameters=return_parameters)
             if pn_response:
@@ -804,11 +805,12 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         eans_set = set()
         filtered_responses = []
         for response in responses:
-            ean = response.get("EAN", "")
-            if ean in eans_set:
-                continue
-            eans_set.add(ean)
-            filtered_responses.append(response)
+            if response and "EAN" in response:
+                ean = response.get("EAN")
+                if ean in eans_set:
+                    continue
+                eans_set.add(ean)
+                filtered_responses.append(response)
         responses = filtered_responses
 
         if alternative_search:
