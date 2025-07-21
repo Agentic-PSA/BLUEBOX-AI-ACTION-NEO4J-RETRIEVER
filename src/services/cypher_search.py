@@ -989,6 +989,12 @@ def compatibility_search(data, params=None):
     types = data.get("types", [])
     ean = ""
     compatible_with = data.get("compatible_with", {})
+
+    pn = compatible_with.get("PN")
+    if pn and len(pn) == 13 and pn[9:].isdigit():
+        compatible_with["action"] = pn
+        del compatible_with["PN"]
+
     if not params:
         if compatible_with.get("action"):
             action = compatible_with["action"]
