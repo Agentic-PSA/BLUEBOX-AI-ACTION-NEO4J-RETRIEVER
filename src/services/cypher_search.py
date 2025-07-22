@@ -26,9 +26,9 @@ client_gpt = openai.OpenAI(
 
 
 
-def llm(prompt):
+def llm(prompt, model="gpt-4.1"):
     response = client_gpt.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         # reasoning_effort='high',
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"}
