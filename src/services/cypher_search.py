@@ -260,7 +260,7 @@ Znak warunku <> oznacza różny i działa też dla napisów.
 Jeżeli użytkownik podał przedział wartości parametru zapisz go jako dwa oddzielne warunki używając odpowiednich znaków nierówności.
 Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
 Jeżeli użytkownik podał tylko jedną wartość dla danego parametru podaj tą wartość w value.
-Nie podawaj parametrów dotyczących kompatybilności z innymi produktami! Pomiń parametry jeżeli dotyczą kompatybilności z innymi produktami.
+Wypełnij tylko parametry, które dotyczą bezpośrednio szukanego produktu, a nie jego zgodności z innymi produktami. Pomiń parametry takie jak marka, model, producent, kompatybilność, itp.
 
 Wartości liczbowe mogą być podane z przecinkiem lub kropką, ale w odpowiedzi użyj kropki jako separatora dziesiętnego.
 Przykłady:
@@ -407,7 +407,7 @@ Jeżeli pytanie dotyczy znalezienia produktu kompatybilnego z innym produktem po
 W pytaniach o kompatybilność określ czy pytanie zawiera parametry szukanego produktu lub ograniczenia ceny czy tylko typ i produkt, z którym ma być kompatybilny. 
 Jeżeli zawiera parametry lub ograniczenia ceny to podaj pole params jako true, jeżeli podany jest tylko kompatybilny produkt to false.
 Odpowiedz w formacie json:
-{{"types": ["lodówki", "tablety"]}}
+{{"types": ["lodówki"]}}
 lub
 {{"name": "Nazwa produktu"}}
 lub jeżeli użytkownik podał kilka produktów:
