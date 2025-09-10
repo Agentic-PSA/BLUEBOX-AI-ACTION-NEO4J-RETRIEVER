@@ -38,8 +38,12 @@ def get_app(root_path: str) -> Sanic:
     app.add_route(AddValues.as_view(), 'add_values/')
     app.add_route(Units.as_view(), 'units/')
 
-    @app.route("/demo", methods=["GET"])
+    @app.route("/demo_search", methods=["GET"])
     async def serve_index(request):
         return await response.file("demo/index.html")
+
+    @app.route("/demo_ean", methods=["GET"])
+    async def serve_index_ean(request):
+        return await response.file("demo/index1.html")
 
     return app
