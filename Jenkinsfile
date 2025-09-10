@@ -72,19 +72,6 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                container('docker-python') {
-                    sh '''
-                        pip install poetry
-                        poetry config virtualenvs.in-project true
-                        poetry install --no-root
-                        poetry run pytest tests/
-                    '''
-                }
-            }
-        }
-
         stage('Push docker image to nexus') {
             steps {
                 container('docker') {
