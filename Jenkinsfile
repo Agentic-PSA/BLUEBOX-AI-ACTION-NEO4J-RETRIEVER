@@ -53,7 +53,7 @@ pipeline {
     }
 
     triggers {
-        gitlab()
+        githubPush()
     }
 
     environment {
