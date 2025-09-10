@@ -8,8 +8,9 @@ WORKDIR /sanic
 COPY requirements.txt requirements.txt
 
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt && \
-    python -m spacy download en_core_web_sm
+    pip install -r requirements.txt
+
+RUN python -m spacy download en_core_web_sm
 
 COPY . .
 
