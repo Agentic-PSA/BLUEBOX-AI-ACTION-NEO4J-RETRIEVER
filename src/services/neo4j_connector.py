@@ -112,6 +112,30 @@ class Neo4jConnector:
                 return self._serialize_node(result["n"])
             return None
 
+    def add_relationship(self, from_node: dict, rel_type: str, to_node: dict, relationship_properties: dict = None):
+        """
+        Tworzy relację między dwoma istniejącymi węzłami.
+        from_node, to_node: dict zawierający 'element_id'
+        rel_type: string np. 'ENRICHED_BY'
+        """
+        relationship_query = f"""
+        MATCH (a) WHERE elementId(a) = $from_id
+        MATCH (b) WHERE elementId(b) = $to_id
+        CREATE (a)-[r:{rel_type} {{
+            {', '.join([f'{k}: ${k}' for k in relationship_properties.keys()]) if relationship_properties else ''}
+        }}]->(b)
+        RETURN r
+        """
+        parameters = {"from_id": from_node["element_id"], "to_id": to_node["element_id"]}
+        if relationship_properties:
+            parameters.update(relationship_properties)
+
+        with self.get_neo4j_session() as session:
+            result = session.execute_write(self._execute_query, relationship_query, parameters)
+            if result:
+                return self._serialize_relationship(result["r"])
+        return None
+
     def add_property_node(self, product_node: dict, property_name: str, property_value, property_label: str, relationship_properties: dict = None):
         logger.info(f"Property type {type(property_value)}")
         property_label = f"`{property_label}`" if ' ' in property_label and "`" not in property_label else property_label
