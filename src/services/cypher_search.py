@@ -624,7 +624,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         except Exception as e:
             return {
                 "success": False,
-                "message": f"Błąd podczas wyszukiwania typów produktów: {str(e)}",
+                "message": f"1 Błąd podczas wyszukiwania typów produktów: {str(e)}",
                 "times": times,
                 "time": sum(times.values())
             }
@@ -855,7 +855,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     except Exception as e:
         return {
             "success": False,
-            "message": f"Błąd podczas wyszukiwania typów produktów: {str(e)}",
+            "message": f"2 Błąd podczas wyszukiwania typów produktów: {str(e)}",
             "times": times,
             "time": sum(times.values())
         }

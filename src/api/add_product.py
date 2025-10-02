@@ -19,6 +19,7 @@ class AddProduct(HTTPMethodView):
         node_type = form.cleaned_data['type'].replace("-", "_")
         properties = form.cleaned_data['properties']
         region = properties.get('region', None)
+        pim_data = form.cleaned_data.get('pim_data', {})
         labels = ["Product", node_type]
         if region:
             labels.append(f"Region_{region}")
@@ -67,6 +68,50 @@ class AddProduct(HTTPMethodView):
 
                     responses.append(response)
                     logger.info(response)
+
+        if pim_data:
+            pim_node = request.app.ctx.NEO4J.add_node(["PIM_Data"], {
+                "PIMProductId": pim_data.get("PIMProductId"),
+                "ProductNumber": pim_data.get("ProductNumber"),
+                "ProductVersion": pim_data.get("ProductVersion"),
+                "ProductType": pim_data.get("ProductType"),
+                "Brand": pim_data.get("Brand"),
+                "Weight": pim_data.get("Weight"),
+                "Height": pim_data.get("Height"),
+                "Width": pim_data.get("Width"),
+                "Depth": pim_data.get("Depth"),
+                "Battery100Wh": pim_data.get("Battery100Wh"),
+                "LooseBattery": pim_data.get("LooseBattery"),
+                "InstalledBattery": pim_data.get("InstalledBattery"),
+                "PKWiU": pim_data.get("PKWiU"),
+                "Large": pim_data.get("Large"),
+                "ImporterGPSR": pim_data.get("ImporterGPSR"),
+                "ProducerGPSR": pim_data.get("ProducerGPSR"),
+                "SferisName": pim_data.get("SferisName")
+            })
+            responses.append(pim_node)
+
+            # relacja Product -> PIM_Data
+            request.app.ctx.NEO4J.add_relationship(product_node, "ENRICHED_BY", pim_node)
+
+            # kolekcje PIM_Data
+            collections_mapping = {
+                "TranslationCollection": "Translation",
+                "BarcodeCollection": "Barcode",
+                "CategoryMapCollection": "Category",
+                "ComponentCollection": "Component",
+                "RelatedProductCollection": "RelatedProduct"
+            }
+            for collection_name, node_label in collections_mapping.items():
+                items = pim_data.get(collection_name, [])
+                if not isinstance(items, list):
+                    continue
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    collection_node = request.app.ctx.NEO4J.add_node([node_label], item)
+                    request.app.ctx.NEO4J.add_relationship(pim_node, "HAS_COLLECTION", collection_node)
+                    responses.append(collection_node)
 
         return JSONResponse(body=responses)
 
