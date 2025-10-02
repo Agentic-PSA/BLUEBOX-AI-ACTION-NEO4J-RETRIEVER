@@ -58,7 +58,7 @@ pipeline {
 
     environment {
         BUILD_VERSION = new Date().format('yyyy-MM-dd')
-        DOCKER_IMAGE_TAG = "bluebox-ai-action-neo4j-retriever-${env.BRANCH_NAME}:${env.BUILD_VERSION}-2"
+        DOCKER_IMAGE_TAG = "bluebox-ai-action-neo4j-retriever-${env.BRANCH_NAME}:${env.BUILD_VERSION}-3"
         NEXUS_DOCKER_REPO = '172.16.10.4:102'
     }
 

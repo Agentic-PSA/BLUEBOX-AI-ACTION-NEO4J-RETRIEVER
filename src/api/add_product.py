@@ -83,11 +83,13 @@ class AddProduct(HTTPMethodView):
             # Pozostałe dane zapisujemy w jednym polu JSON (np. component_collection, bundleType itd.)
             additional_fields = ["ProductVersion", "ProductType", "Weight", "Height", "Width", "Depth",
                                  "Battery100Wh", "LooseBattery", "InstalledBattery", "PKWiU",
-                                 "Large", "ImporterGPSR", "Piktograms", "ProducerGPSR",
-                                 "CategoryMapCollection", "ComponentCollection", "RelatedProductCollection"]
+                                 "Large", "ImporterGPSR", "Piktograms", "ProducerGPSR"]
             for field in additional_fields:
                 if field in pim_data:
                     pim_node_properties[field] = pim_data[field]
+            pim_node_properties['CategoryMapCollection'] = json.dumps(pim_data.get('CategoryMapCollection', []))
+            pim_node_properties['ComponentCollection'] = json.dumps(pim_data.get('ComponentCollection', []))
+            pim_node_properties['RelatedProductCollection'] = json.dumps(pim_data.get('RelatedProductCollection', []))
 
             # Tworzymy węzeł PIM_Data
             pim_node = request.app.ctx.NEO4J.add_node(["PIM_Data"], pim_node_properties)
