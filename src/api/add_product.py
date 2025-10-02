@@ -70,39 +70,38 @@ class AddProduct(HTTPMethodView):
                     logger.info(response)
 
         if pim_data:
-            pim_node = request.app.ctx.NEO4J.add_node(["PIM_Data"], {
+            # Properties do wyszukiwania i te główne
+            pim_node_properties = {
                 "PIMProductId": pim_data.get("PIMProductId"),
                 "ProductNumber": pim_data.get("ProductNumber"),
-                "ProductVersion": pim_data.get("ProductVersion"),
-                "ProductType": pim_data.get("ProductType"),
                 "Brand": pim_data.get("Brand"),
-                "Weight": pim_data.get("Weight"),
-                "Height": pim_data.get("Height"),
-                "Width": pim_data.get("Width"),
-                "Depth": pim_data.get("Depth"),
-                "Battery100Wh": pim_data.get("Battery100Wh"),
-                "LooseBattery": pim_data.get("LooseBattery"),
-                "InstalledBattery": pim_data.get("InstalledBattery"),
-                "PKWiU": pim_data.get("PKWiU"),
-                "Large": pim_data.get("Large"),
-                "ImporterGPSR": pim_data.get("ImporterGPSR"),
-                "ProducerGPSR": pim_data.get("ProducerGPSR"),
+                "DirectoryGTIN": pim_data.get("DirectoryGTIN"),
+                "ProducerNumber": pim_data.get("ProducerNumber"),
                 "SferisName": pim_data.get("SferisName")
-            })
+            }
+
+            # Pozostałe dane zapisujemy w jednym polu JSON (np. component_collection, bundleType itd.)
+            additional_fields = ["ProductVersion", "ProductType", "Weight", "Height", "Width", "Depth",
+                                 "Battery100Wh", "LooseBattery", "InstalledBattery", "PKWiU",
+                                 "Large", "ImporterGPSR", "Piktograms", "ProducerGPSR",
+                                 "CategoryMapCollection", "ComponentCollection", "RelatedProductCollection"]
+            for field in additional_fields:
+                if field in pim_data:
+                    pim_node_properties[field] = pim_data[field]
+
+            # Tworzymy węzeł PIM_Data
+            pim_node = request.app.ctx.NEO4J.add_node(["PIM_Data"], pim_node_properties)
             responses.append(pim_node)
 
-            # relacja Product -> PIM_Data
+            # Relacja Product -> PIM_Data
             request.app.ctx.NEO4J.add_relationship(product_node, "ENRICHED_BY", pim_node)
 
-            # kolekcje PIM_Data
-            collections_mapping = {
+            # Kolekcje do osobnych węzłów tylko dla TranslationCollection i BarcodeCollection (do wyszukiwania)
+            searchable_collections = {
                 "TranslationCollection": "Translation",
-                "BarcodeCollection": "Barcode",
-                "CategoryMapCollection": "Category",
-                "ComponentCollection": "Component",
-                "RelatedProductCollection": "RelatedProduct"
+                "BarcodeCollection": "Barcode"
             }
-            for collection_name, node_label in collections_mapping.items():
+            for collection_name, node_label in searchable_collections.items():
                 items = pim_data.get(collection_name, [])
                 if not isinstance(items, list):
                     continue
