@@ -838,7 +838,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     else:
         return {
             "success": False,
-            "message": f"2 Błąd podczas analizy pytania",
+            "message": f"2 Błąd podczas analizy pytania: {data}",
             "times": times,
             "time": sum(times.values())
         }
