@@ -34,7 +34,7 @@ class AddProduct(HTTPMethodView):
                 main_node_properties['name'] = properties['common'].get('Nazwa', '')
                 if properties['common'].get('Nazwa'):
                     main_node_properties['nameEmbedding'] = get_embedding(properties['common']['Nazwa'])
-                main_node_properties['product_number'] = properties['common'].get('Product number', '')
+                # main_node_properties['product_number'] = properties['common'].get('Product number', '')
                 main_node_properties['producer'] = properties['common'].get('Producent', '')
 
         product_node = request.app.ctx.NEO4J.add_node(labels, main_node_properties)
