@@ -23,12 +23,19 @@ class AddProduct(HTTPMethodView):
         labels = ["Product", node_type]
         if region:
             labels.append(f"Region_{region}")
-        # dodanie głównego node produktu
         main_node_properties = {}
+        action_value = properties.get('action', None)
+
+        if action_value:
+            existing_nodes = request.app.ctx.NEO4J.run_in_tx(
+                lambda tx: request.app.ctx.NEO4J.find_products_fulltext(tx, action_value)
+            )
+            if existing_nodes:
+                logger.info(f"Action '{action_value}' już istnieje, pomijam dodanie produktu")
+                return JSONResponse(body={"message": f"Produkt z action '{action_value}' już istnieje"}, status=200)
+
         if 'EAN' in properties:
             main_node_properties['EAN'] = properties['EAN']
-        if 'action' in properties:
-            main_node_properties['action'] = properties.get('action', '')
         if 'common' in properties:
             if isinstance(properties['common'], dict):
                 main_node_properties['name'] = properties['common'].get('Nazwa', '')
