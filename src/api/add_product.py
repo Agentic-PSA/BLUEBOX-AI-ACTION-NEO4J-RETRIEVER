@@ -32,6 +32,8 @@ class AddProduct(HTTPMethodView):
         if 'common' in properties:
             if isinstance(properties['common'], dict):
                 main_node_properties['name'] = properties['common'].get('Nazwa', '')
+                main_node_properties['nameEN'] = properties['common'].get('NameEN', '')
+                main_node_properties['nameDE'] = properties['common'].get('NameDE', '')
                 if properties['common'].get('Nazwa'):
                     main_node_properties['nameEmbedding'] = get_embedding(properties['common']['Nazwa'])
                 # main_node_properties['product_number'] = properties['common'].get('Product number', '')
@@ -77,7 +79,6 @@ class AddProduct(HTTPMethodView):
                 "Brand": pim_data.get("Brand"),
                 "DirectoryGTIN": pim_data.get("DirectoryGTIN"),
                 "ProducerNumber": pim_data.get("ProducerNumber"),
-                "SferisName": pim_data.get("SferisName")
             }
 
             # Pozostałe dane zapisujemy w jednym polu JSON (np. component_collection, bundleType itd.)
