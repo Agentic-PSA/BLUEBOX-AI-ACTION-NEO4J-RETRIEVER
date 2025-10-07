@@ -79,7 +79,6 @@ class AddProduct(HTTPMethodView):
                 "Brand": pim_data.get("Brand"),
                 "DirectoryGTIN": pim_data.get("DirectoryGTIN"),
                 "ProducerNumber": pim_data.get("ProducerNumber"),
-                "DisplayName": pim_data.get("ProducerNumber"),
             }
 
             # Pozostałe dane zapisujemy w jednym polu JSON (np. component_collection, bundleType itd.)
