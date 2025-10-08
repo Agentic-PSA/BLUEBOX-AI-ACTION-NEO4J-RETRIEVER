@@ -461,6 +461,7 @@ Odpowiedź: {{"types": ["torby do laptopa"], "compatible_with": {{"EAN": "098765
 Pytanie użytkownika:
 {user_query}
     '''
+    print(prompt)
     response_text = llm(prompt)
     data = json.loads(response_text)
     return data
@@ -479,7 +480,7 @@ Pytanie użytkownika:
 Odpowiedz w formacie json:
 {{"types": ["type_code1", "type_code2"]}}
     '''
-
+    print(prompt)
     response_text = llm(prompt)
     data = json.loads(response_text)
     return data
@@ -559,6 +560,7 @@ def correct_generated_params(params, params_values, user_query):
     {{'params': {params}}}
         '''
 
+    print(prompt)
     response_text = llm(prompt)
     data = json.loads(response_text)
     return data.get('params')
