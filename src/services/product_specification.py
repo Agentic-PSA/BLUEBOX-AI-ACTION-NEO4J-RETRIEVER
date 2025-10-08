@@ -70,7 +70,7 @@ def filter_language(specification, language="PL"):
     print("services product_specification filter_language")
 
     filtered_sections = []
-    for section in specification:
+    for section in specification['value']:
         section_name = section.get("section_name", {}).get(language, "")
         filtered_section = {"section_name": section_name, "attributes": []}
         attributes = section.get("attributes", [])
