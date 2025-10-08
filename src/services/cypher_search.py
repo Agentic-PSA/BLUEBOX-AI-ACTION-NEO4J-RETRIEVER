@@ -27,6 +27,7 @@ client_gpt = openai.OpenAI(
 
 
 def llm(prompt, model="gpt-4.1"):
+    print("services cypher_search llm")
     response = client_gpt.chat.completions.create(
         model=model,
         # reasoning_effort='high',
@@ -39,6 +40,7 @@ def llm(prompt, model="gpt-4.1"):
     return response_text
 
 def search_index(names=[]):
+    print("services cypher_search search_index")
     client = Client(verify=False)
     items = [{
                 "item_id": str(uuid.uuid4()),
@@ -64,6 +66,7 @@ def search_index(names=[]):
     return results
 
 def search_group(descriptions=[]):
+    print("services cypher_search search_group")
     client = Client(verify=False)
 
     token = os.environ.get("ACTION_TOKEN")
@@ -92,6 +95,7 @@ def search_group(descriptions=[]):
 
 
 def generate_simple_cypher_query_with_llm(schema_text, relationships, user_query, specifications):
+    print("services cypher_search generate_simple_cypher_query_with_llm")
     # Przygotuj dane jako tekst
     # schema_text = get_schema_text(db_schema)
     # print(schema_text)
@@ -245,6 +249,7 @@ WYMAGANIA TECHNICZNE:
 
 
 def generate_params(question, product_specification, labels):
+    print("services cypher_search generate_params")
 
     # Zapytanie do LLM z elastycznym podejściem
     prompt = f'''
@@ -331,6 +336,7 @@ Odpowiedz w formacie json:
 
 
 def exec_query(params, return_parameters=False):
+    print("services cypher_search exec_query")
     price_query = ""
     price = params.get("price")
     if price:
@@ -391,6 +397,7 @@ RETURN product
         return results
 
 def get_embedding(text, model="text-embedding-3-small"):
+    print("services cypher_search get_embedding")
     response = client_gpt.embeddings.create(
         model=model,
         input=text
@@ -398,6 +405,7 @@ def get_embedding(text, model="text-embedding-3-small"):
     return response.data[0].embedding
 
 def analize_query(user_query):
+    print("services cypher_search analize_query")
     prompt = f'''
 Użytkownik może szukać produktów podając jego parametry lub szukać jednego lub kilku konkretnych produktów podając nazwy, numery EAN lub Part number.
 Jeżeli dla jednego produktu została podana zarówno nazwa jak i EAN, kod Action lub Part number to podaj tylko jedną z tych wartości z priorytetem: EAN > Kod Action > PN > name.
@@ -451,6 +459,7 @@ Pytanie użytkownika:
     return data
 
 def filter_types(user_query, types_response):
+    print("services cypher_search filter_types")
     prompt = f'''
 Określ, których z podanych typów produktów może dotyczyć pytanie użytkownika.
 W odpowiedzi podaj listę type_code.
@@ -469,9 +478,11 @@ Odpowiedz w formacie json:
     return data
 
 def check_ean(text):
+    print("services cypher_search check_ean")
     return 11 <= len(text) <= 13 and text.isdigit()
 
 def check_pn(text):
+    print("services cypher_search check_pn")
     if len(text) > 20:
         return None
     app = Sanic.get_app()
@@ -485,15 +496,18 @@ def check_pn(text):
     return None
 
 def is_action_code(text):
+    print("services cypher_search is_action_code")
     return len(text) == 13 #and text[9:].isdigit()
 
 def check_action(text):
+    print("services cypher_search check_action")
     app = Sanic.get_app()
     response = app.ctx.NEO4J.get_product_by_action_code(text)
     return response
 
 
 def get_params_values(params, types):
+    print("services cypher_search get_params_values")
     names = []
     for property in params.get('requiredProperties', []):
         if isinstance(property.get('value'), str) or isinstance(property.get('value'), bool):
@@ -520,6 +534,7 @@ RETURN DISTINCT p.value
 
 
 def correct_generated_params(params, params_values, user_query):
+    print("services cypher_search correct_generated_params")
     prompt = f'''
     Na podstawie pytania użytkownika została wygenerowana lista parametrów i ich wartości. 
     Sprawdź czy wszystkie podane wartości są dostępne na liście dopuszczalnych wartości.
@@ -543,6 +558,7 @@ def correct_generated_params(params, params_values, user_query):
 
 
 def get_incorrect_params(params, params_values):
+    print("services cypher_search get_incorrect_params")
     properties = params.get('requiredProperties', [])
     incorrect_params = []
     for property in properties:
@@ -555,6 +571,7 @@ def get_incorrect_params(params, params_values):
 
 
 def get_ai_answer(user_query, results):
+    print("services cypher_search get_ai_answer")
     prompt = f'''
 Jesteś chatbotem obsługi klienta w sklepie z elektroniką. Twoim zadaniem jest analizowanie zapytań klientów i odpowiadanie na nie w optymalny sposób, tak aby pomóc im w doborze odpowiedniego sprzętu. 
 Odpowiedz na pytanie użytkownika na podstawie dostarczonych danych.
@@ -575,6 +592,7 @@ Odpowiedz w formacie JSON:
 
 
 def filter_none_params(params_values):
+    print("services cypher_search filter_none_params")
     if 'requiredProperties' in params_values:
         params_values['requiredProperties'] = [
             param for param in params_values['requiredProperties']
@@ -589,6 +607,7 @@ def filter_none_params(params_values):
 
 
 def cypher_search(user_query, return_parameters=False, ai_answer=False):
+    print("services cypher_search cypher_search")
     times = {}
     app = Sanic.get_app()
 
@@ -984,10 +1003,12 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
 
 
 def type_to_label(t: str):
+    print("services cypher_search type_to_label")
     return t.replace("-", "_")
 
 
 def compatibility_search(data, params=None):
+    print("services cypher_search compatibility_search")
     logger.debug(data)
     app = Sanic.get_app()
     types = data.get("types", [])
@@ -1053,6 +1074,7 @@ def compatibility_search(data, params=None):
 
 
 def simple_search(user_query):
+    print("services cypher_search simple_search")
     times = {}
     app = Sanic.get_app()
 

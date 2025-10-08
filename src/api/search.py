@@ -14,6 +14,7 @@ from src.services.ai_search import ai_search
 class Search(HTTPMethodView):
     @staticmethod
     async def post(request: Request) -> JSONResponse:
+        print("Search(HTTPMethodView)")
         form = SearchForm(request.json)
         if not form.is_valid():
             return JSONResponse(body=form.errors, status=400)

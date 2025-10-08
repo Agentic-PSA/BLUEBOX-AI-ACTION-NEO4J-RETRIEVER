@@ -12,10 +12,11 @@ def start():
     loader = AppLoader(factory=partial(get_app, os.getcwd()))
     app = loader.load()
 
-    workers = int(os.environ.get('WORKERS', 4))
-    debug = os.environ.get('DEBUG', False) == 'true'
+    workers = int(os.environ.get('WORKERS', 1))
+    #debug = os.environ.get('DEBUG', False) == 'true'
+    debug = True
     port = int(os.environ.get('PORT', 5013))
-
+    print("debug", debug)
     if os.environ.get('SSL', False) == 'true':
         ssl = {
             "cert": os.path.join(os.getcwd(), 'certs', 'cert.pem'),

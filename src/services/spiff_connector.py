@@ -6,6 +6,7 @@ from psycopg2.extras import Json
 
 class SpiffConnector:
     def __init__(self, user, password, host, port, database):
+        print("services SpiffConnector __init__")
         self.user = user
         self.password = password
         self.host = host
@@ -13,6 +14,7 @@ class SpiffConnector:
         self.database = database
 
     def connect(self):
+        print("services SpiffConnector connect")
         return psycopg2.connect(
             user=self.user,
             password=self.password,
@@ -22,9 +24,11 @@ class SpiffConnector:
         )
 
     def close_connection(self, connection):
+        print("services SpiffConnector close_connection")
         connection.close()
 
     def execute_query(self, connection, query):
+        print("services SpiffConnector execute_query")
         cursor = connection.cursor()
         cursor.execute(query)
         records = cursor.fetchall()
@@ -32,6 +36,7 @@ class SpiffConnector:
         return records
 
     def execute_insert(self, connection, query, values):
+        print("services SpiffConnector execute_insert")
         cursor = connection.cursor()
         try:
             cursor.execute(query, values)
@@ -46,6 +51,7 @@ class SpiffConnector:
 
 
     def get_process_instances_ids_by_identifier(self, process_model_identifier, status=None):
+        print("services SpiffConnector get_process_instances_ids_by_identifier")
         if status:
             query = f"SELECT id FROM public.process_instance WHERE process_model_identifier = '{process_model_identifier}' AND status = '{status}';"
         else:
@@ -60,6 +66,7 @@ class SpiffConnector:
 
 
     def get_tasks_with_max_end_in_seconds(self, process_instance_ids):
+        print("services SpiffConnector get_tasks_with_max_end_in_seconds")
         ids = ', '.join(f"'{id}'" for id in process_instance_ids)
         query = f"""
         SELECT DISTINCT ON (process_instance_id) bpmn_process_id, process_instance_id, state, json_data_hash
@@ -77,6 +84,7 @@ class SpiffConnector:
 
 
     def get_tasks_by_name(self, process_instance_ids, name):
+        print("services SpiffConnector get_tasks_by_name")
         ids = ', '.join(f"'{id}'" for id in process_instance_ids)
         query = f"""
         SELECT DISTINCT ON (t.process_instance_id) t.bpmn_process_id, t.process_instance_id, t.task_definition_id, t.json_data_hash
@@ -94,6 +102,7 @@ class SpiffConnector:
             self.close_connection(connection)
 
     def get_json_data_by_hash(self, json_data_hash):
+        print("services SpiffConnector get_json_data_by_hash")
         query = f"SELECT * FROM public.json_data WHERE hash = '{json_data_hash}';"
 
         connection = self.connect()
@@ -104,6 +113,7 @@ class SpiffConnector:
             self.close_connection(connection)
 
     def get_value_from_data_store(self, data_store_name, top_level_key, secondary_key):
+        print("services SpiffConnector get_value_from_data_store")
         query = f"SELECT id FROM public.kkv_data_store WHERE identifier = '{data_store_name}';"
 
         connection = self.connect()
@@ -121,6 +131,7 @@ class SpiffConnector:
             self.close_connection(connection)
 
     def get_values_from_data_store(self, data_store_name, top_level_key):
+        print("services SpiffConnector get_values_from_data_store")
         query = f"SELECT id FROM public.kkv_data_store WHERE identifier = '{data_store_name}';"
 
         connection = self.connect()
@@ -139,6 +150,7 @@ class SpiffConnector:
 
 
     def add_value_to_data_store(self, data_store_name, top_level_key, secondary_key, value):
+        print("services SpiffConnector add_value_to_data_store")
         query = f"SELECT id FROM public.kkv_data_store WHERE identifier = '{data_store_name}';"
 
         connection = self.connect()
@@ -157,6 +169,7 @@ class SpiffConnector:
             self.close_connection(connection)
 
     def update_value_to_data_store(self, data_store_name, top_level_key, secondary_key, value):
+        print("services SpiffConnector update_value_to_data_store")
         query = f"SELECT id FROM public.kkv_data_store WHERE identifier = '{data_store_name}';"
 
         connection = self.connect()

@@ -16,12 +16,14 @@ class Prices:
              }
 
     def get_all_prices(self, currency: str = "PLN") -> list:
+        print("services prices get_all_prices")
         url = f"https://api.action.pl/api/ade/v2/Product/GetAll?Language=Polish&Currency={currency}"
 
         response = requests.get(url, headers=self.prices_headers)
         return response.json().get("data", [])
 
     def actualize_prices(self, limit=None):
+        print("services prices actualize_prices")
         prices = self.get_all_prices(currency="PLN")
         if limit:
             prices = prices[:limit]
@@ -34,6 +36,7 @@ class Prices:
             print(ean, action_code, price)
 
     def actualize_price(self, item):
+        print("services prices actualize_price")
         price = item.get("price")
         action_code = item.get("productId")
         quantity = item.get("quantity")
@@ -59,6 +62,7 @@ class Prices:
             print(f"Error receiving product for action code {action_code}")
 
     def get_exchangerates(self):
+        print("services prices get_exchangerates")
         currencies = ["USD", "EUR"]
         for currency in currencies:
             url = f"https://api.nbp.pl/api/exchangerates/rates/A/{currency}/"

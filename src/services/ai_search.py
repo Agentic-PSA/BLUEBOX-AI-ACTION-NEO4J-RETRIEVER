@@ -10,6 +10,7 @@ client_gpt = openai.OpenAI(
 
 
 def llm(prompt):
+    print("services ai_search llm")
     response = client_gpt.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
@@ -23,6 +24,7 @@ def llm(prompt):
 
 
 def prompt1(query):
+    print("services ai_search prompt1")
     prompt = """
 Jesteś chatbotem obsługi klienta w sklepie z elektroniką. Twoim zadaniem jest analizowanie zapytań klientów i odpowiadanie na nie w optymalny sposób, tak aby pomóc im w doborze odpowiedniego sprzętu. Twoje odpowiedzi MUSZĄ być zwracane w formacie JSON i nie możesz zadawać dodatkowych pytań. Pamiętaj o poprawności języka i gramatyki.
 
@@ -120,6 +122,7 @@ Pytanie użytkownika:
     return llm(prompt)
 
 def prompt2(query):
+    print("services ai_search prompt2")
     prompt = """
 ZADANIE:
 Działasz jako specjalista ds. sprzętu IT. Twoim zadaniem jest zwrócić jeden wspólny obiekt JSON zawierający propozycje produktów dopasowanych do zapytania użytkownika – z uwzględnieniem znanych modeli handlowych.
@@ -174,6 +177,7 @@ Pytanie użytkownika:
     return llm(prompt)
 
 def ai_search(query, properties=False):
+    print("services ai_search ai_search")
     app = Sanic.get_app()
     start = time.time()
     answer = prompt2(query)

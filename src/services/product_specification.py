@@ -61,8 +61,13 @@ def get_product_specification(type):
     spec_data = get_form_data('category', type.replace("_", "-"))
 
     return spec_data['form']
+    # print("services product_specification get_product_specification")
+    # return connector.get_value_from_data_store(os.environ.get("SPECIFICATION_DATASTORE"),
+    #                                            "attributes",
+    #                                            type.replace("_", "-"))
 
 def filter_language(specification, language="PL"):
+    print("services product_specification filter_language")
 
     filtered_sections = []
     for section in specification:
