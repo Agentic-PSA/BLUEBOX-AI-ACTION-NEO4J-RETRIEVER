@@ -3,7 +3,7 @@ import logging
 from sanic.request import Request
 from sanic.views import HTTPMethodView
 from sanic.response import JSONResponse
-
+from ..services.cypher_search import get_embedding
 from .forms.add_type import AddTypeForm
 
 class AddType(HTTPMethodView):
@@ -17,7 +17,8 @@ class AddType(HTTPMethodView):
         attributes = {
             "code": form.cleaned_data['code'].replace("-", "_"),
             "name": form.cleaned_data.get('name', ''),
-            "specification": str(form.cleaned_data['specification'])
+            "specification": str(form.cleaned_data['specification']),
+            "nameEmbedding": get_embedding(form.cleaned_data.get('name', ''))
         }
 
         response = request.app.ctx.NEO4J.add_node(labels, attributes)
