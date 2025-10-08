@@ -13,6 +13,7 @@ from src.services.cypher_search import simple_search
 class SimpleSearch(HTTPMethodView):
     @staticmethod
     async def post(request: Request) -> JSONResponse:
+        print("SimpleSearch(HTTPMethodView)")
         form = SearchForm(request.json)
         if not form.is_valid():
             return JSONResponse(body=form.errors, status=400)

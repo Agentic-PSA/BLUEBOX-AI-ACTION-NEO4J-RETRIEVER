@@ -9,6 +9,7 @@ from neo4j import GraphDatabase, Result
 from ..utils import UnitConverter
 
 def find_products_fulltext(tx, name, n = 10, similarity = None):
+    print("services neo4j find_products_fulltext")
     query = f"CALL db.index.fulltext.queryNodes('product_name_text', $name) yield node as p, score AS similarity "
     if similarity:
         query += f"WITH p, similarity WHERE similarity >= {similarity} "
@@ -36,6 +37,7 @@ def get_product_and_version_by_action(tx, action: str):
         "ProductVersion": record["version"]
     }
 def find_products_fulltext_by_pn(tx, pn, similarity = 0.98):
+    print("services neo4j find_products_fulltext_by_pn")
     query = f"CALL db.index.fulltext.queryNodes('product_number_text', $pn) yield node as p, score AS similarity "
     if similarity:
         query += f"WITH p, similarity WHERE similarity >= {similarity} "
@@ -47,6 +49,7 @@ def find_products_fulltext_by_pn(tx, pn, similarity = 0.98):
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
 
 def find_similar_products(tx, query_vector, n = 10, similarity = None):
+    print("services neo4j find_similar_products")
     query = f"CALL db.index.vector.queryNodes('name', {n}, $query_vector) yield node as p, score AS similarity "
     if similarity:
         query += f"WITH p, similarity WHERE similarity >= {similarity} "
@@ -56,6 +59,7 @@ def find_similar_products(tx, query_vector, n = 10, similarity = None):
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
 
 def find_similar_pn(tx, query_vector):
+    print("services neo4j find_similar_pn")
     query = """
     CALL db.index.vector.queryNodes('product_number', 5, $query_vector) yield node as p, score AS similarity
     RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
@@ -74,6 +78,8 @@ def find_similar_pn(tx, query_vector):
     return formatted_results
 
 def find_similar_type(tx, query_vector, limit=20):
+    print("services neo4j find_similar_type")
+    print(query_vector)
     query = f"""
     WITH $query_vector AS queryVector
     MATCH (t:Type)
@@ -104,6 +110,7 @@ class Neo4jConnector:
         return self.driver.session()
 
     def add_node(self, labels: list, properties: dict):
+        print("services neo4j add_node")
         labels = [f"`{label}`" if ' ' in label else label for label in labels]
         with self.get_neo4j_session() as session:
             query = f"CREATE (n:{':'.join(labels)} {{"
@@ -116,6 +123,7 @@ class Neo4jConnector:
             return None
 
     def add_value_node(self, properties: dict):
+        print("services neo4j add_value_node")
         correct_value = properties.pop("correct_value")
         with self.get_neo4j_session() as session:
             query = f"MERGE (n:Value {{"
@@ -190,6 +198,7 @@ class Neo4jConnector:
             logger.error(f"Error in update_pim_node: {e}")
             return None
     def add_relationship(self, from_node: dict, rel_type: str, to_node: dict, relationship_properties: dict = None):
+        print("services neo4j add_relationship")
         """
         Tworzy relację między dwoma istniejącymi węzłami.
         from_node, to_node: dict zawierający 'element_id'
@@ -214,6 +223,7 @@ class Neo4jConnector:
         return None
 
     def add_property_node(self, product_node: dict, property_name: str, property_value, property_label: str, relationship_properties: dict = None):
+        print("services neo4j add_property_node")
         logger.info(f"Property type {type(property_value)}")
         property_label = f"`{property_label}`" if ' ' in property_label and "`" not in property_label else property_label
         if isinstance(property_value, dict):
@@ -275,22 +285,26 @@ class Neo4jConnector:
 
     @staticmethod
     def _execute_query(tx, query, parameters):
+        print("services neo4j _execute_query")
         result = tx.run(query, parameters)
         return result.single()
 
     @staticmethod
     def _execute_query_multiple(tx, query, parameters):
+        print("services neo4j _execute_query_multiple")
         result = tx.run(query, parameters)
         return result.values()
 
     @staticmethod
     def _execute_query_records(tx, query, parameters):
+        print("services neo4j _execute_query_records")
         result = tx.run(query, parameters)
         values = [record.data() for record in result]
         return values
 
     @staticmethod
     def _serialize_node(node):
+        print("services neo4j _serialize_node")
         return {
             "element_id": node.element_id,
             "labels": list(node.labels),
@@ -298,12 +312,14 @@ class Neo4jConnector:
         }
     @staticmethod
     def _serialize_relationship(relationship):
+        print("services neo4j _serialize_relationship")
         return {
             "element_id": relationship.element_id,
             "properties": dict(relationship)
         }
 
     def add_unit_property_nodes(self, product_node: dict, property_name: str, property_value, property_unit: str, property_label: str, relationship_properties: dict = None):
+        print("services neo4j add_unit_property_nodes")
         try:
             unit_variants = self.units_converter.convert_to_variants(property_value, property_unit)
             logger.info(f"Unit variants: {unit_variants}")
@@ -373,6 +389,7 @@ class Neo4jConnector:
 
     @staticmethod
     def _serialize_product(record):
+        print("services neo4j _serialize_product")
         product = record[0]
         relationship = record[1]
         property_node = record[2]
@@ -397,6 +414,7 @@ class Neo4jConnector:
 
     @staticmethod
     def generate_ean_variants(ean):
+        print("services neo4j generate_ean_variants")
         variants = [ean]
         if len(ean) == 13 and ean.startswith('0'):
             variants.append(ean[1:])
@@ -413,6 +431,7 @@ class Neo4jConnector:
         return variants
 
     def get_product(self, ean: str):
+        print("services neo4j get_product")
         variants = self.generate_ean_variants(ean)
         for ean_variant in variants:
             with self.get_neo4j_session() as session:
@@ -428,6 +447,7 @@ class Neo4jConnector:
         return None
 
     def get_compatible_products(self, types=[], ean=None, pn=None, action=None):
+        print("services neo4j get_compatible_products")
         if not types:
             return []
         if ean:
@@ -460,6 +480,7 @@ RETURN
                     return result[0][1]
 
     def get_compatible_products_filtered_by_price(self, types=[], params={}, ean=None, pn=None, action=None):
+        print("services neo4j get_compatible_products_filtered_by_price")
         if not types:
             return []
         if ean:
@@ -537,6 +558,7 @@ RETURN
         return None
 
     def filter_compatible_products(self, eans=[], params={}):
+        print("services neo4j filter_compatible_products")
         logger.info(eans)
         logger.info(params)
         query = """
@@ -586,6 +608,7 @@ RETURN product
             return filtered_nodes
 
     def get_product_price(self, action_code: str, currency: str):
+        print("services neo4j get_product_price")
         with self.get_neo4j_session() as session:
             #query = "MATCH (product:Product {action: $action_code})-[:HAS]->(price:Price {currency: $currency}) RETURN price"
             query = """MATCH (product:Product {action: $action_code})
@@ -599,6 +622,7 @@ RETURN product
         return None
 
     def update_price_value(self, price_id, new_value):
+        print("services neo4j update_price_value")
         query = """
             MATCH (price:Price)
             WHERE elementId(price) = $price_id
@@ -629,6 +653,7 @@ RETURN product
         return None
 
     def get_product_with_parameters(self, ean: str):
+        print("services neo4j get_product_with_parameters")
         variants = self.generate_ean_variants(ean)
         ean_in_db = None
         with self.get_neo4j_session() as session:
@@ -679,6 +704,7 @@ RETURN product
             return result
 
     def get_product_by_action_code(self, action_code: str, with_parameters=False):
+        print("services neo4j get_product_by_action_code")
         with self.get_neo4j_session() as session:
             query = "MATCH (product:Product {action: $action})" + \
                     "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
@@ -732,6 +758,7 @@ RETURN product
             return results_with_properties
 
     def get_product_by_pn_vector(self, pn: str, with_parameters=False):
+        print("services neo4j get_product_by_pn_vector")
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=pn
@@ -773,6 +800,7 @@ RETURN product
             return results_with_properties
 
     def get_product_by_pn(self, pn: str, with_parameters=False):
+        print("services neo4j get_product_by_pn")
         pn = re.sub(r'(?<!\\)"', r'\"', pn)
         with self.driver.session() as session:
             results = session.read_transaction(find_products_fulltext_by_pn, pn)
@@ -819,6 +847,7 @@ RETURN product
 
 
     def get_product_by_name_vector(self, name:str, n = 10, with_parameters=False, similarity = None):
+        print("services neo4j get_product_by_name_vector")
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=name
@@ -870,6 +899,7 @@ RETURN product
             return results_with_properties
 
     def get_product_by_name(self, name:str, n = 10, with_parameters=False, similarity = None):
+        print("services neo4j get_product_by_name")
         # response = self.client_gpt.embeddings.create(
         #     model=self.embeddings_model,
         #     input=name
@@ -920,6 +950,7 @@ RETURN product
             return results_with_properties
 
     def get_similar_types(self, text:str):
+        print("services neo4j get_similar_types")
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=text
@@ -931,11 +962,13 @@ RETURN product
         return results
 
     def execute_query(self, query, properties={}):
+        print("services neo4j execute_query")
         with self.get_neo4j_session() as session:
             result = session.execute_write(self._execute_query_records, query, properties)
             return result
 
     def add_bidirectional_relationship_with_properties(self, type1_code, type2_code, relationship_type, relationship_properties1={}, relationship_properties2={}):
+        print("services neo4j add_bidirectional_relationship_with_properties")
         with self.driver.session() as session:
             result = session.write_transaction(
                 self._create_bidirectional_relationship_with_properties,
@@ -946,6 +979,7 @@ RETURN product
     @staticmethod
     def _create_bidirectional_relationship_with_properties(tx, type1_code, type2_code, relationship_type,
                                                            relationship_properties1, relationship_properties2):
+        print("services neo4j _create_bidirectional_relationship_with_properties")
         query = (
             "MATCH (a:Type {code: $type1_code}), (b:Type {code: $type2_code}) "
             f"MERGE (a)-[r1:{relationship_type}]->(b) "
@@ -959,6 +993,7 @@ RETURN product
         return result.single()
 
     def add_properties_to_bidirectional_relationship(self, type1_code, type2_code, relationship_properties1={}, relationship_properties2={}):
+        print("services neo4j add_properties_to_bidirectional_relationship")
         with self.driver.session() as session:
             result = session.write_transaction(
                 self._create_properties_to_bidirectional_relationship,
@@ -969,6 +1004,7 @@ RETURN product
     @staticmethod
     def _create_properties_to_bidirectional_relationship(tx, type1_code, type2_code,
                                                            relationship_properties1, relationship_properties2):
+        print("services neo4j _create_properties_to_bidirectional_relationship")
         logger.info(relationship_properties1)
         logger.info(type(relationship_properties1))
         logger.info(relationship_properties2)
@@ -986,6 +1022,7 @@ RETURN product
         return result.single()
 
     def add_products_bidirectional_relationship_with_properties(self, ean1, ean2, relationship_type, relationship_properties1={}, relationship_properties2={}):
+        print("services neo4j add_products_bidirectional_relationship_with_properties")
         with self.driver.session() as session:
             result = session.write_transaction(
                 self._create_products_bidirectional_relationship_with_properties,
@@ -996,6 +1033,7 @@ RETURN product
     @staticmethod
     def _create_products_bidirectional_relationship_with_properties(tx, ean1, ean2, relationship_type,
                                                            relationship_properties1, relationship_properties2):
+        print("services neo4j _create_products_bidirectional_relationship_with_properties")
         query = (
             "MATCH (a:Product {EAN: $ean1}), (b:Product {EAN: $ean2}) "
             f"MERGE (a)-[r1:{relationship_type}]->(b) "
@@ -1010,6 +1048,7 @@ RETURN product
 
 
     def get_products(self, skip=0, limit=100):
+        print("services neo4j get_products")
         query = """MATCH (product:Product)
                     WITH product, apoc.map.setKey(product, 'action', coalesce(product.action, null)) as productWithAction
                     RETURN apoc.map.submap(productWithAction, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product
@@ -1024,6 +1063,7 @@ RETURN product
 
 
     def get_products_with_parameters(self, skip=0, limit=100, type=None):
+        print("services neo4j get_products_with_parameters")
         label = type if type else "Product"
         query = f"""
             MATCH (prod:{label})
@@ -1062,6 +1102,7 @@ RETURN product
             return nodes
 
     def create_product_price(self, action_code, price, currency, quantity):
+        print("services neo4j create_product_price")
         with self.driver.session() as session:
             query = """
             MATCH (product:Product {action: $action_code})
@@ -1078,6 +1119,7 @@ RETURN product
             return result["price"] if result else None
 
     def get_params_values(self, names, types):
+        print("services neo4j get_params_values")
         cypher_query = '''
         MATCH (n)-[:HAS]->(p:Property_PL {name: $name})
         WHERE any(label in labels(n) WHERE label IN $labels)
