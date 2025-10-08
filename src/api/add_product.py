@@ -4,6 +4,7 @@ from sanic.request import Request
 from sanic.views import HTTPMethodView
 from sanic.response import JSONResponse
 from collections import OrderedDict
+from packaging.version import parse as parse_version
 
 from .forms.add_product import AddProductForm
 from ..services.cypher_search import get_embedding
@@ -25,10 +26,32 @@ class AddProduct(HTTPMethodView):
             labels.append(f"Region_{region}")
         # dodanie głównego node produktu
         main_node_properties = {}
+        if 'action' in properties and properties['action'] != '':
+            existing_product = request.app.ctx.NEO4J.get_product_and_version_by_action(properties['action'])
+            if existing_product:
+                existing_version = existing_product.get('ProductVersion')
+                new_version = pim_data.get('ProductVersion')
+                if parse_version(new_version) == parse_version(existing_version):
+                    return JSONResponse(
+                        body={"error": "Produkt o takim action i wersji już istnieje"},
+                        status=409
+                    )
+                elif parse_version(new_version) > parse_version(existing_version):
+                    # podmieniamy istniejący węzeł
+                    product_node = request.app.ctx.NEO4J.update_product_node(existing_product['action'],
+                                                                             main_node_properties)
+                    if pim_data:
+                        request.app.ctx.NEO4J.update_pim_node(product_node, pim_data)
+                    return JSONResponse(body={"message": "Produkt zaktualizowany do nowszej wersji"})
+                else:
+                    # wersja starsza → nic nie robimy
+                    return JSONResponse(
+                        body={"message": "Istniejący produkt ma nowszą wersję. Brak zmian."},
+                        status=204
+                    )
+
         if 'EAN' in properties:
             main_node_properties['EAN'] = properties['EAN']
-        if 'action' in properties:
-            main_node_properties['action'] = properties.get('action', '')
         if 'common' in properties:
             if isinstance(properties['common'], dict):
                 main_node_properties['name'] = properties['common'].get('Nazwa', '')

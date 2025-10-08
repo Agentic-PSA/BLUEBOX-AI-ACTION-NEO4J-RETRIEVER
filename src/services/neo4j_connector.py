@@ -18,7 +18,23 @@ def find_products_fulltext(tx, name, n = 10, similarity = None):
     result = tx.run(query, name=name)
     return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
+def get_product_and_version_by_action(tx, action: str):
+    query = """
+    MATCH (p:Product {action: $action})-[:ENRICHED_BY]->(pd:PIM_Data)
+    RETURN p.name AS name,
+           p.action AS action,
+           pd.ProductVersion AS version
+    LIMIT 1
+    """
+    record = tx.run(query, action=action).single()
+    if not record:
+        return None
 
+    return {
+        "action": record["action"],
+        "name": record["name"],
+        "ProductVersion": record["version"]
+    }
 def find_products_fulltext_by_pn(tx, pn, similarity = 0.98):
     query = f"CALL db.index.fulltext.queryNodes('product_number_text', $pn) yield node as p, score AS similarity "
     if similarity:
@@ -112,6 +128,67 @@ class Neo4jConnector:
                 return self._serialize_node(result["n"])
             return None
 
+    def update_product_node(self, action: str, new_properties: dict):
+        """
+        Aktualizuje istniejący produkt po action.
+        Zwraca zserializowany węzeł.
+        """
+        try:
+            with self.get_neo4j_session() as session:
+                # Pobranie istniejącego węzła
+                query = "MATCH (p:Product {action: $action}) RETURN p LIMIT 1"
+                result = session.execute_read(self._execute_query, query, {"action": action})
+                if not result:
+                    logger.warning(f"Produkt {action} nie istnieje")
+                    return None
+                node = result["p"]
+
+                # Aktualizacja właściwości
+                set_clauses = ", ".join([f"`{k}` = ${k}" for k in new_properties.keys()])
+                update_query = f"MATCH (p) WHERE elementId(p) = $id SET {set_clauses} RETURN p"
+                parameters = {"id": node.id}  # lub node["element_id"] w zależności od serializacji
+                parameters.update(new_properties)
+
+                updated_result = session.execute_write(self._execute_query, update_query, parameters)
+                return self._serialize_node(updated_result["p"])
+        except Exception as e:
+            logger.error(f"Error in update_product_node: {e}")
+            return None
+
+    def update_pim_node(self, product_node: dict, pim_data: dict):
+        """
+        Aktualizuje powiązany węzeł PIM_Data dla istniejącego produktu.
+        """
+        try:
+            with self.get_neo4j_session() as session:
+                query = """
+                MATCH (p)-[r:ENRICHED_BY]->(pd:PIM_Data)
+                WHERE elementId(p) = $product_id
+                RETURN pd LIMIT 1
+                """
+                result = session.execute_read(self._execute_query, query, {"product_id": product_node["element_id"]})
+                if not result:
+                    logger.warning(f"Nie znaleziono PIM_Data dla produktu {product_node['element_id']}")
+                    return None
+                pd_node = result["pd"]
+
+                # Przygotowanie właściwości
+                pim_properties = pim_data.copy()
+                # Możesz tutaj np. JSON-ować kolekcje, jeśli w nich są listy
+                for key in ["CategoryMapCollection", "ComponentCollection", "RelatedProductCollection"]:
+                    if key in pim_properties:
+                        pim_properties[key] = json.dumps(pim_properties[key])
+
+                set_clauses = ", ".join([f"`{k}` = ${k}" for k in pim_properties.keys()])
+                update_query = f"MATCH (pd) WHERE elementId(pd) = $id SET {set_clauses} RETURN pd"
+                parameters = {"id": pd_node.id}  # lub pd_node["element_id"]
+                parameters.update(pim_properties)
+
+                updated_result = session.execute_write(self._execute_query, update_query, parameters)
+                return self._serialize_node(updated_result["pd"])
+        except Exception as e:
+            logger.error(f"Error in update_pim_node: {e}")
+            return None
     def add_relationship(self, from_node: dict, rel_type: str, to_node: dict, relationship_properties: dict = None):
         """
         Tworzy relację między dwoma istniejącymi węzłami.
@@ -534,6 +611,22 @@ RETURN product
                                                         price_id=price_id,
                                                         new_value=new_value
                                                     ).single())
+
+    def get_product_and_version_by_action(self, action: str):
+        with self.get_neo4j_session() as session:
+            query = """
+            MATCH (p:Product {action: $action})-[:ENRICHED_BY]->(pd:PIM_Data)
+            RETURN p.name AS name,
+                   p.action AS action,
+                   pd.ProductVersion AS version
+            LIMIT 1
+            """
+            properties = {"action": action}
+            result = session.execute_read(self._execute_query_multiple, query, properties)
+            logger.debug(result)
+            if result:
+                return result[0]
+        return None
 
     def get_product_with_parameters(self, ean: str):
         variants = self.generate_ean_variants(ean)
