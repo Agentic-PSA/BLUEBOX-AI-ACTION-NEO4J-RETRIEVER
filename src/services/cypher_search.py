@@ -905,7 +905,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     try:
         start = time.time()
         params = generate_params(user_query, specifications, types)
-        params = filter_none_params(params)
+        # params = filter_none_params(params)
         end = time.time()
         logger.info(f"Generowanie parametrów cypher: {end - start} s")
         times["Generowanie parametrów cypher"] = end - start
