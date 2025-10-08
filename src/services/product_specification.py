@@ -60,7 +60,7 @@ def get_form_data(column: str, value: str) -> dict:
 def get_product_specification(type):
     spec_data = get_form_data('category', type.replace("_", "-"))
 
-    return spec_data['form']
+    return spec_data['form'][0]['value']
     # print("services product_specification get_product_specification")
     # return connector.get_value_from_data_store(os.environ.get("SPECIFICATION_DATASTORE"),
     #                                            "attributes",
@@ -70,7 +70,7 @@ def filter_language(specification, language="PL"):
     print("services product_specification filter_language")
 
     filtered_sections = []
-    for section in specification[0]['value']:
+    for section in specification:
         section_name = section.get("section_name", {}).get(language, "")
         filtered_section = {"section_name": section_name, "attributes": []}
         attributes = section.get("attributes", [])
