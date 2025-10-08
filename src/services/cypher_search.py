@@ -384,6 +384,9 @@ RETURN product
     if return_parameters:
         cypher_query += ", properties"
 
+    print(cypher_query)
+    print(params)
+
     with driver.session() as session:
         result = session.run(cypher_query, params)
         records = list(result)
