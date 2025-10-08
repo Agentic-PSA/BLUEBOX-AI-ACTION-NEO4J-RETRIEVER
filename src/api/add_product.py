@@ -49,7 +49,7 @@ class AddProduct(HTTPMethodView):
                         body={"message": "Istniejący produkt ma nowszą wersję. Brak zmian."},
                         status=204
                     )
-
+            main_node_properties['action'] = properties['action']
         if 'EAN' in properties:
             main_node_properties['EAN'] = properties['EAN']
         if 'common' in properties:
