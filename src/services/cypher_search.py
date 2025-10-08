@@ -362,7 +362,8 @@ OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL) """
 }) as properties
 WHERE size([reqProp IN $requiredProperties WHERE
   size([prop IN properties WHERE
-    prop.name = reqProp.name AND
+    toLower(prop.name) = toLower(reqProp.name)
+ AND
     (
       (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toLower(toString(prop.value)) IN reqProp.value) OR
       (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
@@ -924,7 +925,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     try:
         start = time.time()
         params = generate_params(user_query, specifications, types)
-        # params = filter_none_params(params)
+        params = filter_none_params(params)
         end = time.time()
         logger.info(f"Generowanie parametrów cypher: {end - start} s")
         times["Generowanie parametrów cypher"] = end - start
