@@ -676,6 +676,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             specifications = {}
             for t in types:
                 # print(f"Pobieranie specyfikacji dla typu: {t}")
+                print('CCCCCCCCCCCCCCCCC_________________CCCCCCCCCCCCCCCCCCCC')
+                print(t)
+                print('DDDDDDDDDDDDDDDDD______________DDDDDDDDDDDDDDDDDDDDDDDDDDD')
                 specification = src.services.product_specification.get_product_specification(t)
                 if specification:
                     specification = src.services.product_specification.filter_language(specification, "PL")
