@@ -329,6 +329,9 @@ Odpowiedz w formacie json:
     '''
 
     #response_content = response_text.replace('```', '').replace('json', '')
+    print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
+    print(prompt)
+    print('BBBBBBBBBB________________________BBBBBBBBBBBBBBBBBBBBBBB')
     response_text = llm(prompt)
     params = json.loads(response_text)
     # params["productTypes"] = labels
