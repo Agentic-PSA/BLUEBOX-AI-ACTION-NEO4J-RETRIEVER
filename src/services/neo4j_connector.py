@@ -19,23 +19,7 @@ def find_products_fulltext(tx, name, n = 10, similarity = None):
     result = tx.run(query, name=name)
     return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
-def get_product_and_version_by_action(tx, action: str):
-    query = """
-    MATCH (p:Product {action: $action})-[:ENRICHED_BY]->(pd:PIM_Data)
-    RETURN p.name AS name,
-           p.action AS action,
-           pd.ProductVersion AS version
-    LIMIT 1
-    """
-    record = tx.run(query, action=action).single()
-    if not record:
-        return None
 
-    return {
-        "action": record["action"],
-        "name": record["name"],
-        "ProductVersion": record["version"]
-    }
 def find_products_fulltext_by_pn(tx, pn, similarity = 0.98):
     print("services neo4j find_products_fulltext_by_pn")
     query = f"CALL db.index.fulltext.queryNodes('product_number_text', $pn) yield node as p, score AS similarity "
@@ -649,7 +633,11 @@ RETURN product
             result = session.execute_read(self._execute_query_multiple, query, properties)
             logger.debug(result)
             if result:
-                return result[0]
+                return {
+                    "name": result[0][0],
+                    "action": result[0][1],
+                    "ProductVersion": result[0][2]
+                }
         return None
 
     def get_product_with_parameters(self, ean: str):
