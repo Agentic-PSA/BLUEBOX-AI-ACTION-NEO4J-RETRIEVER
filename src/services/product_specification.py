@@ -61,7 +61,7 @@ def get_form_data(column: str, value: str, table: str= 'forms') -> dict:
 def get_product_specification(type):
     category = get_form_data('category', type, table='category_to_type')
     print(category)
-    spec_data = get_form_data('category', category.get('Type'))
+    spec_data = get_form_data('category', category.get('type'))
 
     return spec_data['form'][0]['value']
     # print("services product_specification get_product_specification")
