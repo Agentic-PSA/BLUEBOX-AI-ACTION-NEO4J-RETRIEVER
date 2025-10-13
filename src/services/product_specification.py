@@ -16,7 +16,7 @@ connector = SpiffConnector(user=os.environ.get("SPIFF_DB_USER"),
                            database=os.environ.get("SPIFF_DB_DATABASE"))
 
 
-def get_form_data(column: str, value: str) -> dict:
+def get_form_data(column: str, value: str, table: str= 'forms') -> dict:
     """
     Pobiera dane formularza z bazy danych PostgreSQL dla podanej kolumny.
 
@@ -42,14 +42,15 @@ def get_form_data(column: str, value: str) -> dict:
                 password="CQ15V1xNC9"
         ) as conn:
             with conn.cursor(cursor_factory=extras.RealDictCursor) as cursor:
-                query = sql.SQL("SELECT * FROM forms WHERE {field} = %s LIMIT 1").format(
+                query = sql.SQL("SELECT * FROM {table} WHERE {field} = %s LIMIT 1").format(
+                    table=sql.Identifier(table),
                     field=sql.Identifier(column)
                 )
                 cursor.execute(query, [value])
                 result = cursor.fetchone()
 
                 if not result:
-                    raise ValueError(f"Brak danych w tabeli forms dla {column} = '{value}'")
+                    raise ValueError(f"Brak danych w tabeli {table} dla {column} = '{value}'")
 
                 return dict(result)
 
@@ -58,7 +59,8 @@ def get_form_data(column: str, value: str) -> dict:
         raise
 
 def get_product_specification(type):
-    spec_data = get_form_data('category', type.replace("_", "-"))
+    category = get_form_data('category', type, table='category_to_type')
+    spec_data = get_form_data('category', category.get('Type'))
 
     return spec_data['form'][0]['value']
     # print("services product_specification get_product_specification")
