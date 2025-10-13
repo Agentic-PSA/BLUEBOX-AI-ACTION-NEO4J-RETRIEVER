@@ -10,7 +10,7 @@ class AddProductForm:
     def is_valid(self) -> bool:
         node_type: str = self.raw_data.get('type', '')
         properties: dict = self.raw_data.get('properties', {})
-
+        additional_types: list = self.raw_data.get('additional_types', [])
         if not node_type:
             self.errors.append({'type': 'Type is missing'})
         if not properties:

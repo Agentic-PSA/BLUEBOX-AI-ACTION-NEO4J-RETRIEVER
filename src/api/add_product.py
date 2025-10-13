@@ -18,10 +18,11 @@ class AddProduct(HTTPMethodView):
             return JSONResponse(body=form.errors, status=400)
         responses = []
         node_type = form.cleaned_data['type'].replace("-", "_")
+        additional_types = form.cleaned_data.get('additional_types', [])
         properties = form.cleaned_data['properties']
         region = properties.get('region', None)
         pim_data = form.cleaned_data.get('pim_data', {})
-        labels = ["Product", node_type]
+        labels = ["Product", node_type, *additional_types]
         if region:
             labels.append(f"Region_{region}")
         # dodanie głównego node produktu
