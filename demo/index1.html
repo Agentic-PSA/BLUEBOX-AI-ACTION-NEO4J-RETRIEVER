@@ -9,7 +9,7 @@
             const eanValue = document.getElementById('ean').value;
             const resultContainer = document.getElementById('result');
             try {
-                const response = await fetch('http://localhost:5013/get_product', {
+                const response = await fetch('http://172.19.5.46:30713/get_product', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
