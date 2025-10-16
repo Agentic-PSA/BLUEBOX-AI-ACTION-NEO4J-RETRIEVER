@@ -8,18 +8,6 @@ from neo4j import GraphDatabase, Result
 
 from ..utils import UnitConverter
 
-def find_products_fulltext(tx, name, n = 10, similarity = None):
-    print("services neo4j find_products_fulltext")
-    query = f"CALL db.index.fulltext.queryNodes('product_name_text', $name) yield node as p, score AS similarity "
-    if similarity:
-        query += f"WITH p, similarity WHERE similarity >= {similarity} "
-    query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
-    query += f"LIMIT {n}"
-    name = re.sub(r'(?<!/)/(?!/)', '//', name)
-    result = tx.run(query, name=name)
-    return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
-             "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
-
 def find_products_fulltext_by_pn(tx, pn, similarity = 0.98):
     print("services neo4j find_products_fulltext_by_pn")
     query = f"CALL db.index.fulltext.queryNodes('product_number_text', $pn) yield node as p, score AS similarity "
@@ -29,16 +17,6 @@ def find_products_fulltext_by_pn(tx, pn, similarity = 0.98):
     query += f"LIMIT 1"
     pn = re.sub(r'(?<!/)/(?!/)', '//', pn)
     result = tx.run(query, pn=pn)
-    return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
-             "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
-
-def find_similar_products(tx, query_vector, n = 10, similarity = None):
-    print("services neo4j find_similar_products")
-    query = f"CALL db.index.vector.queryNodes('name', {n}, $query_vector) yield node as p, score AS similarity "
-    if similarity:
-        query += f"WITH p, similarity WHERE similarity >= {similarity} "
-    query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity"
-    result = tx.run(query, query_vector=query_vector)
     return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
              "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
 
@@ -836,16 +814,36 @@ RETURN product
 
     def get_product_by_name_vector(self, name:str, n = 10, with_parameters=False, similarity = None):
         print("services neo4j get_product_by_name_vector")
+
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=name
         )
         query_vector = response.data[0].embedding
+
+        properties = {"query_vector": query_vector}
+        query = f"CALL db.index.vector.queryNodes('name', {n}, $query_vector) yield node as p, score AS similarity "
+        if similarity:
+            query += f"WITH p, similarity WHERE similarity >= {similarity} "
+        query += "RETURN p.name AS name, p.EAN AS EAN, p.producer AS producer, p.action AS action, similarity"
+    
+    
         with self.driver.session() as session:
-            results = session.read_transaction(find_similar_products, query_vector, n, similarity)
+            raw_results = session.execute_read(self._execute_query_records, query, properties)
+            results = [
+                {
+                    "EAN": record["EAN"],
+                    "name": record["name"],
+                    "similarity": record["similarity"],
+                    "action": record["action"],
+                    "producer": record["producer"]
+                }
+                for record in raw_results
+            ]
             logger.debug(results)
             if not with_parameters:
                 return results
+
             results_with_properties = []
             for result in results:
                 ean = result.get("EAN", "")
@@ -888,14 +886,29 @@ RETURN product
 
     def get_product_by_name(self, name:str, n = 10, with_parameters=False, similarity = None):
         print("services neo4j get_product_by_name")
-        # response = self.client_gpt.embeddings.create(
-        #     model=self.embeddings_model,
-        #     input=name
-        # )
-        # query_vector = response.data[0].embedding
         name = re.sub(r'(?<!\\)"', r'\"', name)
+        name = re.sub(r'(?<!/)/(?!/)', '//', name)
+        properties = {"name": name}
+
+        query = f"CALL db.index.fulltext.queryNodes('product_name_text', $name) yield node as p, score AS similarity "
+        if similarity:
+            query += f"WITH p, similarity WHERE similarity >= {similarity} "
+        query += "RETURN p.name AS name, p.EAN AS EAN, p.producer AS producer, p.action AS action, similarity "
+        query += f"LIMIT {n}"
+
         with self.driver.session() as session:
-            results = session.read_transaction(find_products_fulltext, name, n, similarity)
+            raw_results = session.execute_read(self._execute_query_records, query, properties)
+            results = [
+                {
+                    "EAN": record["EAN"],
+                    "name": record["name"],
+                    "similarity": record["similarity"],
+                    "action": record["action"],
+                    "producer": record["producer"]
+                }
+                for record in raw_results
+            ]
+
             logger.debug(results)
             if not with_parameters:
                 return results
@@ -938,16 +951,34 @@ RETURN product
             return results_with_properties
 
     def get_similar_types(self, text:str):
+        print("services neo4j get_similar_types 222")
+        print(self)
+        query = f"""
+        WITH $query_vector AS queryVector
+        MATCH (t:Type)
+        WITH t, gds.similarity.cosine(queryVector, t.nameEmbedding) AS similarity
+        RETURN t.code AS type_code, t.name AS type_name, similarity
+        ORDER BY similarity DESC
+        LIMIT 20
+        """
         print("services neo4j get_similar_types")
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=text
         )
         query_vector = response.data[0].embedding
-        with self.driver.session() as session:
-            results = session.read_transaction(find_similar_type, query_vector)
+        #with self.driver.session() as session:
+        with self.get_neo4j_session() as session:
+            properties = {"query_vector": query_vector}
+            #results = session.read_transaction(find_similar_type, query_vector)
+            results = session.execute_read(self._execute_query_multiple, query, properties)
+            formatted_results = []
+            for record in results:
+                formatted_results.append({"type_code": record["type_code"], "type_name": record["type_name"], "similarity": record["similarity"]})
             logger.debug(results)
+            logger.debug(formatted_results)
         return results
+    
 
     def execute_query(self, query, properties={}):
         print("services neo4j execute_query")
