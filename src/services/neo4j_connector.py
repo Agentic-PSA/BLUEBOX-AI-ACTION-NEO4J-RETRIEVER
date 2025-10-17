@@ -350,8 +350,18 @@ class Neo4jConnector:
             with self.get_neo4j_session() as session:
                 # query = "MATCH (product:Product {EAN: $ean})-[r:HAS]->(property) " + \
                 #         "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number']) AS product, r, property"
-                query = "MATCH (product:Product {EAN: $ean})" + \
-                        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'action', `product_number`]) AS product"
+                # query = "MATCH (product:Product {EAN: $ean})" + \
+                #        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'action', 'product_number']) AS product"
+                query = """
+                MATCH (product:Product {EAN: $ean})
+                RETURN {
+                    EAN: product.EAN,
+                    name: product.name,
+                    producer: product.producer,
+                    action: product.action,
+                    product_number: product.product_number
+                } AS product
+                """
                 properties = {"ean": ean_variant}
                 result = session.execute_read(self._execute_query_multiple, query, properties)
                 logger.debug(result)
