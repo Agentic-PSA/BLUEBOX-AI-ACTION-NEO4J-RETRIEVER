@@ -8,55 +8,6 @@ from neo4j import GraphDatabase, Result
 
 from ..utils import UnitConverter
 
-def find_products_fulltext_by_pn(tx, pn, similarity = 0.98):
-    print("services neo4j find_products_fulltext_by_pn")
-    query = f"CALL db.index.fulltext.queryNodes('product_number_text', $pn) yield node as p, score AS similarity "
-    if similarity:
-        query += f"WITH p, similarity WHERE similarity >= {similarity} "
-    query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
-    query += f"LIMIT 1"
-    pn = re.sub(r'(?<!/)/(?!/)', '//', pn)
-    result = tx.run(query, pn=pn)
-    return [{"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
-             "PN": record["PN"], "action": record["action"], "producer": record["producer"]} for record in result]
-
-def find_similar_pn(tx, query_vector):
-    print("services neo4j find_similar_pn")
-    query = """
-    CALL db.index.vector.queryNodes('product_number', 5, $query_vector) yield node as p, score AS similarity
-    RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
-    """
-
-    similarity_100 = False
-    result = tx.run(query, query_vector=query_vector)
-    formatted_results = []
-    for record in result:
-        if record["similarity"] >= 0.999:
-            similarity_100 = True
-        if similarity_100 and record["similarity"] < 0.999:
-            break
-        formatted_results.append({"EAN": record["EAN"], "name": record["name"], "similarity": record["similarity"],
-             "PN": record["PN"], "action": record["action"], "producer": record["producer"]})
-    return formatted_results
-
-def find_similar_type(tx, query_vector, limit=20):
-    print("services neo4j find_similar_type")
-    print(query_vector)
-    query = f"""
-    WITH $query_vector AS queryVector
-    MATCH (t:Type)
-    WITH t, gds.similarity.cosine(queryVector, t.nameEmbedding) AS similarity
-    RETURN t.code AS type_code, t.name AS type_name, similarity
-    ORDER BY similarity DESC
-    LIMIT {limit}
-    """
-
-    result = tx.run(query, query_vector=query_vector)
-    formatted_results = []
-    for record in result:
-        formatted_results.append({"type_code": record["type_code"], "type_name": record["type_name"], "similarity": record["similarity"]})
-    return formatted_results
-
 class Neo4jConnector:
     def __init__(self):
         uri = f'bolt://{os.environ.get("NEO4J_HOST")}:{os.environ.get("NEO4J_PORT")}'
@@ -400,7 +351,7 @@ class Neo4jConnector:
                 # query = "MATCH (product:Product {EAN: $ean})-[r:HAS]->(property) " + \
                 #         "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number']) AS product, r, property"
                 query = "MATCH (product:Product {EAN: $ean})" + \
-                        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'action']) AS product"
+                        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'action', `product_number`]) AS product"
                 properties = {"ean": ean_variant}
                 result = session.execute_read(self._execute_query_multiple, query, properties)
                 logger.debug(result)
@@ -723,15 +674,39 @@ RETURN product
                 results_with_properties.append(result_with_properties[0])
             return results_with_properties
 
+
     def get_product_by_pn_vector(self, pn: str, with_parameters=False):
         print("services neo4j get_product_by_pn_vector")
+        query = """
+        CALL db.index.vector.queryNodes('product_number', 5, $query_vector) yield node as p, score AS similarity
+        RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity
+        """
+
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=pn
         )
         query_vector = response.data[0].embedding
+        properties = {"query_vector": query_vector}
+    
+        similarity_100 = False
+        results = []
         with self.driver.session() as session:
-            results = session.read_transaction(find_similar_pn, query_vector)
+            raw_results = session.execute_read(self._execute_query_records, query, properties)
+            for record in raw_results:
+                if record["similarity"] >= 0.999:
+                    similarity_100 = True
+                if similarity_100 and record["similarity"] < 0.999:
+                    break
+                results.append({
+                    "EAN": record["EAN"],
+                    "name": record["name"],
+                    "similarity": record["similarity"],
+                    "action": record["action"],
+                    "producer": record["producer"],
+                    "PN": record["PN"]
+                })
+
             logger.debug(results)
             if not with_parameters:
                 return results
@@ -765,11 +740,35 @@ RETURN product
                 results_with_properties.append(result_with_properties[0])
             return results_with_properties
 
+
+
     def get_product_by_pn(self, pn: str, with_parameters=False):
         print("services neo4j get_product_by_pn")
+        similarity = 0.98
+        query = f"CALL db.index.fulltext.queryNodes('product_number_text', $pn) yield node as p, score AS similarity "
+        if similarity:
+            query += f"WITH p, similarity WHERE similarity >= {similarity} "
+        query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
+        query += f"LIMIT 1"
         pn = re.sub(r'(?<!\\)"', r'\"', pn)
+        pn = re.sub(r'(?<!/)/(?!/)', '//', pn)
+        properties = {"pn": pn}
+
+
+
         with self.driver.session() as session:
-            results = session.read_transaction(find_products_fulltext_by_pn, pn)
+            raw_results = session.execute_read(self._execute_query_records, query, properties)
+            results = [
+                {
+                    "EAN": record["EAN"],
+                    "name": record["name"],
+                    "similarity": record["similarity"],
+                    "action": record["action"],
+                    "producer": record["producer"],
+                    "PN": record["PN"]
+                }
+                for record in raw_results
+            ]
             logger.debug(results)
             if not with_parameters:
                 return results
@@ -825,7 +824,7 @@ RETURN product
         query = f"CALL db.index.vector.queryNodes('name', {n}, $query_vector) yield node as p, score AS similarity "
         if similarity:
             query += f"WITH p, similarity WHERE similarity >= {similarity} "
-        query += "RETURN p.name AS name, p.EAN AS EAN, p.producer AS producer, p.action AS action, similarity"
+        query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity"
     
     
         with self.driver.session() as session:
@@ -836,7 +835,8 @@ RETURN product
                     "name": record["name"],
                     "similarity": record["similarity"],
                     "action": record["action"],
-                    "producer": record["producer"]
+                    "producer": record["producer"],
+                    "PN": record["PN"]
                 }
                 for record in raw_results
             ]
@@ -893,7 +893,7 @@ RETURN product
         query = f"CALL db.index.fulltext.queryNodes('product_name_text', $name) yield node as p, score AS similarity "
         if similarity:
             query += f"WITH p, similarity WHERE similarity >= {similarity} "
-        query += "RETURN p.name AS name, p.EAN AS EAN, p.producer AS producer, p.action AS action, similarity "
+        query += "RETURN p.name AS name, p.EAN AS EAN, p.product_number AS PN, p.producer AS producer, p.action AS action, similarity "
         query += f"LIMIT {n}"
 
         with self.driver.session() as session:
@@ -904,7 +904,8 @@ RETURN product
                     "name": record["name"],
                     "similarity": record["similarity"],
                     "action": record["action"],
-                    "producer": record["producer"]
+                    "producer": record["producer"],
+                    "PN": record["PN"]
                 }
                 for record in raw_results
             ]
@@ -950,9 +951,9 @@ RETURN product
                 results_with_properties.append(result_with_properties[0])
             return results_with_properties
 
+
     def get_similar_types(self, text:str):
-        print("services neo4j get_similar_types 222")
-        print(self)
+        print("services neo4j get_similar_types")
         query = f"""
         WITH $query_vector AS queryVector
         MATCH (t:Type)
@@ -961,18 +962,16 @@ RETURN product
         ORDER BY similarity DESC
         LIMIT 20
         """
-        print("services neo4j get_similar_types")
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
             input=text
         )
         query_vector = response.data[0].embedding
-        #with self.driver.session() as session:
-        with self.get_neo4j_session() as session:
-            properties = {"query_vector": query_vector}
-            #results = session.read_transaction(find_similar_type, query_vector)
-            results = session.execute_read(self._execute_query_multiple, query, properties)
-            formatted_results = []
+        properties = {"query_vector": query_vector}
+        formatted_results = []
+        with self.driver.session() as session:
+            results = session.execute_read(self._execute_query_records, query, properties)
+            
             for record in results:
                 formatted_results.append({"type_code": record["type_code"], "type_name": record["type_name"], "similarity": record["similarity"]})
             logger.debug(results)
