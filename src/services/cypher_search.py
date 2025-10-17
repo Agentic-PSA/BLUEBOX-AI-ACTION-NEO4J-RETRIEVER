@@ -643,6 +643,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 params_search = True if params_search.lower() == "true" else False
             start = time.time()
             types_response = app.ctx.NEO4J.get_similar_types(types_query)
+            #price_response = self.neo4j.get_product_price(action_code, currency)
             types = [t["type_code"] for t in types_response]
             logger.debug(types)
             data["types"] = types
@@ -878,6 +879,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     try:
         start = time.time()
         types_response = app.ctx.NEO4J.get_similar_types(types_query)
+        #price_response = self.neo4j.get_product_price(action_code, currency)
         types = [t["type_code"] for t in types_response]
         end = time.time()
         logger.info(f"Wyszukiwanie typów produktów: {end - start} s")
