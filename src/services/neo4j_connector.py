@@ -254,7 +254,17 @@ class Neo4jConnector:
 
                     if result is None:
                             logger.info(f"Creating node")
-                            query = f"CREATE (n:{property_label} {{`name`: $property_name, `value`: $property_value, `value_min`: $property_value_min, `value_max`: $property_value_max,`unit`: $property_unit, `default_unit`: $default_unit}}) RETURN n"
+                            #query = f"CREATE (n:{property_label} {{`name`: $property_name, `value`: $property_value, `value_min`: $property_value_min, `value_max`: $property_value_max,`unit`: $property_unit, `default_unit`: $default_unit}}) RETURN n"
+                            query = f"""
+                            CREATE (n:{property_label})
+                            SET n.name = $property_name,
+                                n.value = $property_value,
+                                n.value_min = $property_value_min,
+                                n.value_max = $property_value_max,
+                                n.unit = $property_unit,
+                                n.default_unit = $default_unit
+                            RETURN n
+                            """
                             logger.info(query)
                             result = session.execute_write(self._execute_query, query, property_data)
                             logger.info(result)
