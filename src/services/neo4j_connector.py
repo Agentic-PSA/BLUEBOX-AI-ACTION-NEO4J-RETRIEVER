@@ -142,8 +142,10 @@ class Neo4jConnector:
         if isinstance(property_value, dict):
             logger.warning(f"Adding unit property node: {property_value}")
             value = property_value.get("value")
+            value_max = property_value.get("value_max")
+            value_min = property_value.get("value_min")
             unit = property_value.get("unit")
-            return self.add_unit_property_nodes(product_node, property_name, value, unit, property_label, relationship_properties)
+            return self.add_unit_property_nodes(product_node, property_name, value, unit, property_label, relationship_properties, value_min, value_max)
         if isinstance(property_value, list):
             results = []
             for value in property_value:
@@ -231,7 +233,7 @@ class Neo4jConnector:
             "properties": dict(relationship)
         }
 
-    def add_unit_property_nodes(self, product_node: dict, property_name: str, property_value, property_unit: str, property_label: str, relationship_properties: dict = None):
+    def add_unit_property_nodes(self, product_node: dict, property_name: str, property_value, property_unit: str, property_label: str, relationship_properties: dict = None, value_min = None, value_max = None):
         print("services neo4j add_unit_property_nodes")
         try:
             unit_variants = self.units_converter.convert_to_variants(property_value, property_unit)
@@ -242,7 +244,9 @@ class Neo4jConnector:
                     property_data = {"property_name": property_name,
                                      "property_value": value,
                                      "property_unit": key,
-                                     "default_unit": key == property_unit
+                                     "default_unit": key == property_unit,
+                                     "property_value_min": value_min,
+                                     "property_value_max": value_max
                                      }
                     query = f"MATCH (n:{property_label} {{`name`: $property_name, `value`: $property_value, `unit`: $property_unit}}) RETURN n"
                     logger.info(query)
@@ -250,7 +254,7 @@ class Neo4jConnector:
 
                     if result is None:
                             logger.info(f"Creating node")
-                            query = f"CREATE (n:{property_label} {{`name`: $property_name, `value`: $property_value, `unit`: $property_unit, `default_unit`: $default_unit}}) RETURN n"
+                            query = f"CREATE (n:{property_label} {{`name`: $property_name, `value`: $property_value, `value_min`: $property_value_min, `value_max`: $property_value_max,`unit`: $property_unit, `default_unit`: $default_unit}}) RETURN n"
                             logger.info(query)
                             result = session.execute_write(self._execute_query, query, property_data)
                             logger.info(result)
