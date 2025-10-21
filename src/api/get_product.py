@@ -4,6 +4,7 @@ from sanic.views import HTTPMethodView
 from sanic.response import JSONResponse
 
 from .forms.get_product import GetProductForm
+from src.services.product_specification import get_form_data
 
 class GetProduct(HTTPMethodView):
     @staticmethod
@@ -30,13 +31,32 @@ class GetProduct(HTTPMethodView):
         elif 'name' in form.cleaned_data:
             name = form.cleaned_data.get('name', None)
             response = request.app.ctx.NEO4J.get_product_by_name(name, with_parameters=parameters)
+
         if response:
+            if parameters:
+                # dodanie sekcji z Danymi podstawowymi
+                attributes_basic = []
+                spec_data = get_form_data('category', 'Grzejniki', table='forms')
+                for block in spec_data.get("form", {}):
+                    for section in block.get("value", []):
+                        section_name = section.get("section_name", {}).get("PL")
+                        if section_name == "Dane podstawowe":
+                            for attr in section.get("attributes", []):
+                                attributes_basic.append(attr.get("PL"))
+                to_add = []
+                for resp in response:
+                    for prop in resp.get("properties", []):
+                        if prop.get("name") in attributes_basic:
+                            prop_copy = prop.copy()
+                            prop_copy["section"] = "Dane podstawowe"
+                            to_add.append(prop_copy)
+                    resp["properties"] = to_add + resp.get("properties", [])
+
             return JSONResponse(body=response)
         if not response:
             return JSONResponse(body={"error": "Product not found"}, status=404)
 
         formatted_response = await GetProduct.format_response(formatted_response, response)
-
         return JSONResponse(body=formatted_response)
 
     @staticmethod
