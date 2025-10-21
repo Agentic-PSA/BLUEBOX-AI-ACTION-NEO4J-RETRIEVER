@@ -1,4 +1,5 @@
 import pint
+import re
 
 units_variants = {
     "m": ["nm", "mm", "cm", "dm", "m", "in"],
@@ -32,7 +33,7 @@ class UnitConverter:
                           self.ureg.watt_hour, self.ureg.pascal, self.ureg.lumen, self.ureg.percent, self.ureg.ohm,
                           self.ureg.ampere_hour, self.ureg.degree_Celsius]
 
-    def convert_to_variants(self, value, unit):
+    def _convert_to_variants(self, value, unit):
         if unit in pixel_units:
             return {"px": value}
 
@@ -42,7 +43,7 @@ class UnitConverter:
             return {unit: value}
         except pint.errors.UndefinedUnitError as e:
             if "m2" in unit or "m3" in unit:
-                return self.convert_to_variants(value, unit.replace("m2", "m**2").replace("m3", "m**3"))
+                return self._convert_to_variants(value, unit.replace("m2", "m**2").replace("m3", "m**3"))
             return {unit: value}
 
 
@@ -59,4 +60,43 @@ class UnitConverter:
         result = {}
         for variant in unit_variants:
             result[variant] = x.to(variant).m
+        return result
+
+    def convert_to_variants(self, value, unit):
+        """Obsługuje zakresy (10-20, 10/20/30) i zwraca wyniki {'unit': {'min': ..., 'max': ...}}."""
+        # 🔹 Normalizacja jednostek (m2 → m**2)
+        if "m2" in unit or "m3" in unit:
+            unit = unit.replace("m2", "m**2").replace("m3", "m**3")
+
+        # 🔹 Jeśli mamy zakres np. "10-20", "10/20/30", "10-20-30"
+        if isinstance(value, str):
+            numbers = re.findall(r"[-+]?\d*\.?\d+", value)
+            if len(numbers) > 1:
+                nums = [float(n) for n in numbers]
+                vmin, vmax = min(nums), max(nums)
+                return self._convert_range_to_variants(vmin, vmax, unit)
+            elif len(numbers) == 1:
+                v = float(numbers[0])
+                return self._convert_range_to_variants(v, v, unit)
+
+        # 🔹 Jeśli pojedyncza liczba
+        try:
+            v = float(value)
+            return self._convert_range_to_variants(v, v, unit)
+        except Exception:
+            return {unit: {"min": value, "max": value}}
+
+    def _convert_range_to_variants(self, vmin, vmax, unit):
+        """Wykorzystuje Twoją _convert_to_variants do konwersji zakresu."""
+        variants_min = self._convert_to_variants(vmin, unit)
+        variants_max = self._convert_to_variants(vmax, unit)
+        result = {}
+
+        # scal wyniki min/max dla każdej jednostki
+        all_units = set(variants_min.keys()) | set(variants_max.keys())
+        for u in all_units:
+            min_val = variants_min.get(u, vmin)
+            max_val = variants_max.get(u, vmax)
+            result[u] = {"min": min_val, "max": max_val}
+
         return result

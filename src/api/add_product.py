@@ -33,11 +33,13 @@ class AddProduct(HTTPMethodView):
                 existing_version = existing_product.get('ProductVersion')
                 new_version = pim_data.get('ProductVersion')
                 if parse_version(new_version) == parse_version(existing_version):
+                    print("Produkt o takim action i wersji już istnieje")
                     return JSONResponse(
                         body={"error": "Produkt o takim action i wersji już istnieje"},
                         status=409
                     )
                 elif parse_version(new_version) > parse_version(existing_version):
+                    print("Produkt zaktualizowany do nowszej wersji")
                     # podmieniamy istniejący węzeł
                     product_node = request.app.ctx.NEO4J.update_product_node(existing_product['action'],
                                                                              main_node_properties)
@@ -45,6 +47,7 @@ class AddProduct(HTTPMethodView):
                         request.app.ctx.NEO4J.update_pim_node(product_node, pim_data)
                     return JSONResponse(body={"message": "Produkt zaktualizowany do nowszej wersji"})
                 else:
+                    print("Istniejący produkt ma nowszą wersję. Brak zmian.")
                     # wersja starsza → nic nie robimy
                     return JSONResponse(
                         body={"message": "Istniejący produkt ma nowszą wersję. Brak zmian."},
