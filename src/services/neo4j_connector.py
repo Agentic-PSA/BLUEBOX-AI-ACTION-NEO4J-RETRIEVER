@@ -371,14 +371,11 @@ class Neo4jConnector:
                 # query = "MATCH (product:Product {EAN: $ean})" + \
                 #        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'action', 'product_number']) AS product"
                 query = """
-                MATCH (product:Product {EAN: $ean})
-                RETURN {
-                    EAN: product.EAN,
-                    name: product.name,
-                    producer: product.producer,
-                    action: product.action,
-                    product_number: product.product_number
-                } AS product
+                    MATCH (product:Product {EAN: $ean})
+                    RETURN apoc.map.merge(
+                        {labels: labels(product)},
+                        apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action'])
+                    ) AS product
                 """
                 properties = {"ean": ean_variant}
                 result = session.execute_read(self._execute_query_multiple, query, properties)
@@ -603,8 +600,15 @@ RETURN product
         ean_in_db = None
         with self.get_neo4j_session() as session:
             for ean_variant in variants:
-                query = "MATCH (product:Product {EAN: $ean})" + \
-                        "RETURN apoc.map.clean(product, ['EAN', 'name', 'producer', 'product_number', 'action'], []) AS product;"
+                #query = "MATCH (product:Product {EAN: $ean})" + \
+                #        "RETURN apoc.map.clean(product, ['EAN', 'name', 'producer', 'product_number', 'action'], []) AS product;"
+                query = """
+                    MATCH (product:Product {EAN: $ean})
+                    RETURN apoc.map.merge(
+                        {labels: labels(product)},
+                        apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action'])
+                    ) AS product
+                """
                 properties = {"ean": ean_variant}
                 result = session.execute_read(self._execute_query_multiple, query, properties)
                 logger.debug(result)
@@ -614,6 +618,7 @@ RETURN product
             if not ean_in_db:
                 return None
 
+            labels = result[0][0].get("labels", [])
             query = """
                     MATCH (prod:Product {EAN: $ean})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
@@ -643,16 +648,23 @@ RETURN product
                     } as product
                     """
             properties = {"ean": ean_in_db}
-            logger.debug(properties)
             result = session.execute_read(self._execute_query, query, properties)
-            logger.debug(result)
-            return result
+            product_data = dict(result[0].get("product", result[0]))
+            product_data["labels"] = labels
+            return [product_data]
 
     def get_product_by_action_code(self, action_code: str, with_parameters=False):
         print("services neo4j get_product_by_action_code")
         with self.get_neo4j_session() as session:
-            query = "MATCH (product:Product {action: $action})" + \
-                    "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
+            #query = "MATCH (product:Product {action: $action})" + \
+            #        "RETURN apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action']) AS product"
+            query = """
+                    MATCH (product:Product {action: $action})
+                    RETURN apoc.map.merge(
+                        {labels: labels(product)},
+                        apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action'])
+                    ) AS product
+                """
             properties = {"action": action_code}
             results = session.execute_read(self._execute_query_multiple, query, properties)
 
@@ -665,6 +677,7 @@ RETURN product
 
             for result in results[0]:
                 ean = result.get("EAN", "")
+                labels = result.get("labels", [])
                 logger.debug(f"ean: {ean}")
                 query = """
                     MATCH (prod:Product {EAN: $ean})
@@ -699,7 +712,9 @@ RETURN product
                                 """
                 properties = {"ean": ean}
                 result_with_properties = session.execute_read(self._execute_query, query, properties)
-                results_with_properties.append(result_with_properties[0])
+                product_data = result_with_properties[0]
+                product_data["labels"] = labels
+                results_with_properties.append(product_data)
             return results_with_properties
 
 

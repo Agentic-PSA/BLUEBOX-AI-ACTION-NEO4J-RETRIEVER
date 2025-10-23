@@ -4,7 +4,7 @@ from sanic.views import HTTPMethodView
 from sanic.response import JSONResponse
 
 from .forms.get_product import GetProductForm
-from src.services.product_specification import get_form_data
+from src.services.product_specification import get_form_data_many
 
 class GetProduct(HTTPMethodView):
     @staticmethod
@@ -33,10 +33,10 @@ class GetProduct(HTTPMethodView):
             response = request.app.ctx.NEO4J.get_product_by_name(name, with_parameters=parameters)
 
         if response:
-            if parameters:
+            if parameters and response[0].get("labels"):
                 # dodanie sekcji z Danymi podstawowymi
                 attributes_basic = []
-                spec_data = get_form_data('category', 'Grzejniki', table='forms')
+                spec_data = get_form_data_many('category', response[0]["labels"], table='forms')
                 for block in spec_data.get("form", {}):
                     for section in block.get("value", []):
                         section_name = section.get("section_name", {}).get("PL")

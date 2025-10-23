@@ -16,6 +16,52 @@ connector = SpiffConnector(user=os.environ.get("SPIFF_DB_USER"),
                            database=os.environ.get("SPIFF_DB_DATABASE"))
 
 
+def get_form_data_many(column: str, labels: list, table: str= 'forms') -> dict:
+    """
+    Pobiera dane formularza z bazy danych PostgreSQL dla podanej kolumny.
+
+    Args:
+        column (str): nazwa kolumny w tabeli forms
+        value (str): wartość do wyszukania w kolumnie
+
+    Returns:
+        dict: rekord z tabeli forms jako słownik
+
+    Raises:
+        ValueError: jeśli nie znaleziono danych lub kolumna jest niedozwolona
+        psycopg2.Error: w przypadku błędu połączenia lub zapytania
+    """
+
+
+    try:
+        with psycopg2.connect(
+                host=os.environ.get("POSTGRES_HOST"),
+                port=os.environ.get("POSTGRES_PORT"),
+                database=os.environ.get("POSTGRES_DB"),
+                user=os.environ.get("POSTGRES_USER"),
+                password=os.environ.get("POSTGRES_PASSWORD")
+        ) as conn:
+            with conn.cursor(cursor_factory=extras.RealDictCursor) as cursor:
+                placeholders = sql.SQL(',').join(sql.Placeholder() * len(labels))
+                query = sql.SQL("SELECT * FROM {table} WHERE {field} IN ({values})").format(
+                    table=sql.Identifier(table),
+                    field=sql.Identifier(column),
+                    values=placeholders
+                )
+                cursor.execute(query, labels)
+                result = cursor.fetchone()
+
+                if not result:
+                    raise ValueError(f"Brak danych w tabeli {table} dla {column} = '{labels}'")
+
+                return dict(result)
+
+    except Exception as e:
+        print(f"Błąd podczas pobierania danych z bazy: {e}")
+        raise
+
+
+
 def get_form_data(column: str, value: str, table: str= 'forms') -> dict:
     """
     Pobiera dane formularza z bazy danych PostgreSQL dla podanej kolumny.

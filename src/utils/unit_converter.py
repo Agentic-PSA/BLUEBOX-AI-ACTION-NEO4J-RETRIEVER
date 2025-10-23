@@ -36,6 +36,12 @@ class UnitConverter:
     def _convert_to_variants(self, value, unit):
         if unit in pixel_units:
             return {"px": value}
+        if "m2" in unit:
+            unit = unit.replace("m2", "m**2")
+        if "m3" in unit:
+            unit = unit.replace("m3", "m**3")
+        if unit == '"':
+            unit = 'in'
 
         try:
             x: pint.Quantity = self.ureg.Quantity(value=value, units=unit)
@@ -65,9 +71,12 @@ class UnitConverter:
     def convert_to_variants(self, value, unit):
         """Obsługuje zakresy (10-20, 10/20/30) i zwraca wyniki {'unit': {'min': ..., 'max': ...}}."""
         # 🔹 Normalizacja jednostek (m2 → m**2)
-        if "m2" in unit or "m3" in unit:
-            unit = unit.replace("m2", "m**2").replace("m3", "m**3")
-
+        if "m2" in unit:
+            unit = unit.replace("m2", "m**2")
+        if "m3" in unit:
+            unit = unit.replace("m3", "m**3")
+        if unit == '"':
+            unit = 'in'
         # 🔹 Jeśli mamy zakres np. "10-20", "10/20/30", "10-20-30"
         if isinstance(value, str):
             numbers = re.findall(r"[-+]?\d*\.?\d+", value)
