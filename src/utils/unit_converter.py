@@ -36,6 +36,11 @@ class UnitConverter:
     def _convert_to_variants(self, value, unit):
         if unit in pixel_units:
             return {"px": value}
+        if unit in ["x", "X", "×"]:
+            print("xxxxxxxxxxxxxxxxxxxxxx1", value, unit)
+            return {"dimensionless": value}
+        if unit == "stron":
+            return {"stron": value}
         if "m2" in unit:
             unit = unit.replace("m2", "m**2")
         if "m3" in unit:
@@ -46,8 +51,10 @@ class UnitConverter:
         try:
             x: pint.Quantity = self.ureg.Quantity(value=value, units=unit)
         except pint.errors.OffsetUnitCalculusError as e:
+            print("xxxxxxxxxxxxxxxxxxxxxx2", value, unit)
             return {unit: value}
         except pint.errors.UndefinedUnitError as e:
+            print("xxxxxxxxxxxxxxxxxxxxxx3", value, unit)
             if "m2" in unit or "m3" in unit:
                 return self._convert_to_variants(value, unit.replace("m2", "m**2").replace("m3", "m**3"))
             return {unit: value}
@@ -66,6 +73,9 @@ class UnitConverter:
         result = {}
         for variant in unit_variants:
             result[variant] = x.to(variant).m
+
+        if "in" in result:
+            result['"'] = result["in"]
         return result
 
     def convert_to_variants(self, value, unit):
