@@ -781,6 +781,11 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             logger.info(f"Odpowiedź AI: {end - start} s")
             times["Odpowiedź AI"] = end - start
 
+        if name_response:
+            similarity = name_response[0].get("similarity")
+            if isinstance(similarity, (int, float)) and similarity >= 0.995:
+                del name_response[1:]
+
         return {
             "success": True,
             "search_type": "name",
