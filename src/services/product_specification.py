@@ -106,18 +106,39 @@ def get_form_data(column: str, value: str, table: str= 'forms') -> dict:
 
 def get_product_specification(type):
     category = get_form_data('category', type, table='category_to_type')
-    print(category)
     spec_data = get_form_data('category', category.get('type'), table='forms')
+    return [spec_data['form_with_values'][0]['value'], spec_data['values_map']]
+    #return spec_data['form'][0]['value']
 
-    return spec_data['form'][0]['value']
     # print("services product_specification get_product_specification")
     # return connector.get_value_from_data_store(os.environ.get("SPECIFICATION_DATASTORE"),
     #                                            "attributes",
     #                                            type.replace("_", "-"))
 
-def filter_language(specification, language="PL"):
-    print("services product_specification filter_language")
+def filter_language(specification, language="PL", mapping={}):
+    filtered_sections = []
+    for section in specification:
+        section_name = section.get("section_name", {}).get(language, "")
+        if section_name == 'Dane podstawowe':
+            continue
+        filtered_section = {"section_name": section_name, "attributes": []}
+        attributes = section.get("attributes", [])
+        for attribute_dict in attributes:
+            attribute = attribute_dict.get(language, "")
 
+            mapping_section = mapping.get(section_name, {})
+            mapping_attr = mapping_section.get(attribute, {})
+            unit = mapping_attr.get("unit", "")
+
+            if unit:
+                struct = {attribute: {"unit": unit}}
+            else:
+                values = attribute_dict.get("values", [])
+                struct = {attribute: {"values": values}}
+            filtered_section["attributes"].append(struct)
+        filtered_sections.append(filtered_section)
+
+    return filtered_sections
     filtered_sections = []
     for section in specification:
         section_name = section.get("section_name", {}).get(language, "")

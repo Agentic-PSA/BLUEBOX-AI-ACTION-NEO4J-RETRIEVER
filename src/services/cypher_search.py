@@ -99,6 +99,8 @@ def generate_simple_cypher_query_with_llm(schema_text, relationships, user_query
     # Przygotuj dane jako tekst
     # schema_text = get_schema_text(db_schema)
     # print(schema_text)
+    # print(json.dumps(specifications, ensure_ascii=False, indent=2))
+
 
     relationships_text = "\n".join([
         f"- {rel['source']} -> {rel['relationship']} -> {rel['target']}"
@@ -163,12 +165,15 @@ WYMAGANIA TECHNICZNE:
     # print(prompt)
     response = client_gpt.chat.completions.create(
         model="o1",
+        #model="gpt-4.1",
         #reasoning_effort='high',
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"}
     )
+    print('----------response-----------')
     print(response)
     response_text = response.choices[0].message.content
+    print('----------response text-----------')
     print(response_text)
     response_content = response_text.replace('```', '').replace('json', '')
     # message = json.loads(response_text)
@@ -260,7 +265,7 @@ Jeżeli użytkownik pyta o cenę podaj ją w polu price jako słownik z kluczami
 W polu currency podaj walutę ceny, jeżeli nie jest podana w pytaniu to PLN. Możliwe waluty: PLN, EUR, USD.
 Dostępne jednostki:
 m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
-W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: <, >, <=, >, <>.
+W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: =, <, >, <=, >, <>.
 Znak warunku <> oznacza różny i działa też dla napisów. 
 Jeżeli użytkownik podał przedział wartości parametru zapisz go jako dwa oddzielne warunki używając odpowiednich znaków nierówności.
 Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
@@ -273,10 +278,35 @@ Przykłady:
 0,7 l - value: 0.7 unit: "l"
 1,00009 GWh - value: 1.00009 unit: "GWh"
 
+Specyfikacji produktu jest postaci:
+{{
+    "Nazwa typu":
+        [
+            {{
+                "section_name": "Nazwa sekcji",
+                "attributes":
+                    [
+                        {{
+                            "Nazwa atrybutu":
+                                {{
+                                    "unit": "jednostka"
+                                    "values" : ["wartość 1", "wartość 2", "wartość N"]
+
+                                }}
+                        }}
+                    ]
+            }}
+        ]
+}}
+
+Dla każdego atrybutu występuje unit lub values.
+Jeśli występuje unit, należy dobrać wartość.
+Jeśli wystepuje values, należy wybrać z dostępnych opcji.
+
 Pytanie użytkownika:
 {question}
 
-Pola dostępne w wybranych typach produktów:
+Pola dostępne w wybranych typach produktów (specyfikacja produktu):
 {product_specification}
 
 Odpowiedz w formacie json:
@@ -329,11 +359,13 @@ Odpowiedz w formacie json:
     '''
 
     #response_content = response_text.replace('```', '').replace('json', '')
-    print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
-    print(prompt)
-    print('BBBBBBBBBB________________________BBBBBBBBBBBBBBBBBBBBBBB')
+    #print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
+    #print(prompt)
+    #print('BBBBBBBBBB________________________BBBBBBBBBBBBBBBBBBBBBBB')
     response_text = llm(prompt)
     params = json.loads(response_text)
+    #print('----------------response--------------')
+    #print(params)
     # params["productTypes"] = labels
     return params
 
@@ -464,6 +496,8 @@ Pytanie użytkownika:
     print(prompt)
     response_text = llm(prompt)
     data = json.loads(response_text)
+    print('--------------response--------------')
+    print(data)
     return data
 
 def filter_types(user_query, types_response):
@@ -681,13 +715,15 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             for t in types:
                 # print(f"Pobieranie specyfikacji dla typu: {t}")
 
-                specification = src.services.product_specification.get_product_specification(t)
+                arr = src.services.product_specification.get_product_specification(t)
+                specification = arr[0]
+                mapping = arr[1]
                 if specification:
-                    specification = src.services.product_specification.filter_language(specification, "PL")
+                    specification = src.services.product_specification.filter_language(specification, "PL", mapping)
                     specifications[type_to_label(t)] = specification
             end = time.time()
-            logger.info(f"Pobieranie specyfikacji: {end - start} s")
-            times["Pobieranie specyfikacji"] = end - start
+            logger.info(f"Pobieranie specyfikacji 1: {end - start} s")
+            times["Pobieranie specyfikacji 1"] = end - start
             logger.info(specifications)
         except Exception as e:
             return {
@@ -923,14 +959,16 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         for t in types:
 
             # print(f"Pobieranie specyfikacji dla typu: {t}")
-            specification = src.services.product_specification.get_product_specification(t)
+            arr = src.services.product_specification.get_product_specification(t)
+            specification = arr[0]
+            mapping = arr[1]
             if specification:
-                specification = src.services.product_specification.filter_language(specification, "PL")
+                specification = src.services.product_specification.filter_language(specification, "PL", mapping)
                 specifications[type_to_label(t)] = specification
         end = time.time()
-        logger.info(f"Pobieranie specyfikacji: {end - start} s")
-        times["Pobieranie specyfikacji"] = end - start
-        logger.info(specifications)
+        logger.info(f"Pobieranie specyfikacji 2: {end - start} s")
+        times["Pobieranie specyfikacji 2"] = end - start
+        #logger.info(specifications)
     except Exception as e:
         return {
             "success": False,
