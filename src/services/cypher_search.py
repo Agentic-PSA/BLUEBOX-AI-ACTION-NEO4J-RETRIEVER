@@ -357,7 +357,8 @@ Odpowiedz w formacie json:
   }}
 }}
     '''
-
+    print('PROMPT LEN: ', len(prompt))
+    #print(product_specification)
     #response_content = response_text.replace('```', '').replace('json', '')
     #print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
     #print(prompt)
@@ -718,8 +719,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 arr = src.services.product_specification.get_product_specification(t)
                 specification = arr[0]
                 mapping = arr[1]
+                categories = arr[2]
                 if specification:
-                    specification = src.services.product_specification.filter_language(specification, "PL", mapping)
+                    specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, t)
                     specifications[type_to_label(t)] = specification
             end = time.time()
             logger.info(f"Pobieranie specyfikacji 1: {end - start} s")
@@ -962,8 +964,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             arr = src.services.product_specification.get_product_specification(t)
             specification = arr[0]
             mapping = arr[1]
+            categories = arr[2]
             if specification:
-                specification = src.services.product_specification.filter_language(specification, "PL", mapping)
+                specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, t)
                 specifications[type_to_label(t)] = specification
         end = time.time()
         logger.info(f"Pobieranie specyfikacji 2: {end - start} s")

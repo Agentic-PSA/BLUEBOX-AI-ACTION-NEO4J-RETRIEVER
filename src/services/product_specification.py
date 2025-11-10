@@ -107,7 +107,7 @@ def get_form_data(column: str, value: str, table: str= 'forms') -> dict:
 def get_product_specification(type):
     category = get_form_data('category', type, table='category_to_type')
     spec_data = get_form_data('category', category.get('type'), table='forms')
-    return [spec_data['form_with_values'][0]['value'], spec_data['values_map']]
+    return [spec_data['form_with_values'][0]['value'], spec_data['values_map'], spec_data['categories']]
     #return spec_data['form'][0]['value']
 
     # print("services product_specification get_product_specification")
@@ -115,7 +115,8 @@ def get_product_specification(type):
     #                                            "attributes",
     #                                            type.replace("_", "-"))
 
-def filter_language(specification, language="PL", mapping={}):
+def filter_language(specification, language="PL", mapping={}, categories={}, category=''):
+    print('filter_language', category)
     filtered_sections = []
     for section in specification:
         section_name = section.get("section_name", {}).get(language, "")
@@ -125,6 +126,11 @@ def filter_language(specification, language="PL", mapping={}):
         attributes = section.get("attributes", [])
         for attribute_dict in attributes:
             attribute = attribute_dict.get(language, "")
+
+            if categories.get(section_name, {}).get(attribute):
+                if categories[section_name][attribute]:
+                    if category not in categories[section_name][attribute]:
+                        continue
 
             mapping_section = mapping.get(section_name, {})
             mapping_attr = mapping_section.get(attribute, {})
@@ -136,17 +142,6 @@ def filter_language(specification, language="PL", mapping={}):
                 values = attribute_dict.get("values", [])
                 struct = {attribute: {"values": values}}
             filtered_section["attributes"].append(struct)
-        filtered_sections.append(filtered_section)
-
-    return filtered_sections
-    filtered_sections = []
-    for section in specification:
-        section_name = section.get("section_name", {}).get(language, "")
-        filtered_section = {"section_name": section_name, "attributes": []}
-        attributes = section.get("attributes", [])
-        for attribute_dict in attributes:
-            attribute = attribute_dict.get(language, "")
-            filtered_section["attributes"].append(attribute)
         filtered_sections.append(filtered_section)
 
     return filtered_sections
