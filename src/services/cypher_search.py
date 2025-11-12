@@ -268,7 +268,7 @@ m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh
 W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: =, <, >, <=, >, <>.
 Znak warunku <> oznacza różny i działa też dla napisów. 
 Jeżeli użytkownik podał przedział wartości parametru zapisz go jako dwa oddzielne warunki używając odpowiednich znaków nierówności.
-Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę. Wszystkie wartości w liście zapisz tylko małymi literami.
+Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę.
 Jeżeli użytkownik podał tylko jedną wartość dla danego parametru podaj tą wartość w value.
 Wypełnij tylko parametry, które dotyczą bezpośrednio szukanego produktu, a nie jego zgodności z innymi produktami. Pomiń parametry takie jak marka, model, producent, kompatybilność, itp.
 
@@ -299,9 +299,9 @@ Specyfikacji produktu jest postaci:
         ]
 }}
 
-Dla każdego atrybutu występuje unit lub values.
-Jeśli występuje unit, należy dobrać wartość.
-Jeśli wystepuje values, należy wybrać z dostępnych opcji.
+W specyfikacji produktu, dla każdego atrybutu występuje klucz unit lub values.
+Jeśli występuje klucz unit, należy dobrać wartość.
+Jeśli wystepuje klucz values, należy wybrać z dostępnych opcji (zachowaj dokładne dopasowanie, nie zmieniaj wielkości liter)
 
 Pytanie użytkownika:
 {question}
@@ -358,7 +358,7 @@ Odpowiedz w formacie json:
 }}
     '''
     print('PROMPT LEN: ', len(prompt))
-    #print(product_specification)
+    # print(product_specification)
     #response_content = response_text.replace('```', '').replace('json', '')
     #print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
     #print(prompt)
@@ -603,6 +603,8 @@ def correct_generated_params(params, params_values, user_query):
 
 def get_incorrect_params(params, params_values):
     print("services cypher_search get_incorrect_params")
+    print(params)
+    print(params_values)
     properties = params.get('requiredProperties', [])
     incorrect_params = []
     for property in properties:
