@@ -7,6 +7,7 @@ import os
 from neo4j import GraphDatabase, Result
 
 from ..utils import UnitConverter
+from collections import OrderedDict
 
 class Neo4jConnector:
     def __init__(self):
@@ -15,6 +16,8 @@ class Neo4jConnector:
         self.units_converter = UnitConverter()
         self.client_gpt = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         self.embeddings_model = "text-embedding-3-small"
+        self._cache = OrderedDict()
+        self._cache_limit = 1000
 
     def close(self):
         self.driver.close()
@@ -198,26 +201,22 @@ class Neo4jConnector:
 
     @staticmethod
     def _execute_query(tx, query, parameters):
-        print("services neo4j _execute_query")
         result = tx.run(query, parameters)
         return result.single()
 
     @staticmethod
     def _execute_query_multiple(tx, query, parameters):
-        print("services neo4j _execute_query_multiple")
         result = tx.run(query, parameters)
         return result.values()
 
     @staticmethod
     def _execute_query_records(tx, query, parameters):
-        print("services neo4j _execute_query_records")
         result = tx.run(query, parameters)
         values = [record.data() for record in result]
         return values
 
     @staticmethod
     def _serialize_node(node):
-        print("services neo4j _serialize_node")
         return {
             "element_id": node.element_id,
             "labels": list(node.labels),
@@ -225,7 +224,6 @@ class Neo4jConnector:
         }
     @staticmethod
     def _serialize_relationship(relationship):
-        print("services neo4j _serialize_relationship")
         return {
             "element_id": relationship.element_id,
             "properties": dict(relationship)
@@ -233,11 +231,6 @@ class Neo4jConnector:
 
     def add_unit_property_nodes(self, product_node: dict, property_name: str, property_value, property_unit: str, property_label: str, relationship_properties: dict = None):
         print("services neo4j add_unit_property_nodes")
-        print("----------------------------")
-        print(property_name)
-        print(property_value)
-        print(property_unit)
-        print(property_label)
         try:
             unit_variants = self.units_converter.convert_to_variants(property_value, property_unit)
             print(unit_variants)
@@ -253,11 +246,24 @@ class Neo4jConnector:
                                      "default_unit": key == property_unit
                                      }
                     query = f"MATCH (n:{property_label} {{`name`: $property_name, `value`: $property_value, `value_min`: $property_value_min, `value_max`: $property_value_max, `unit`: $property_unit}}) RETURN n"
-                    logger.info(query)
-                    result = session.execute_read(self._execute_query, query, property_data)
 
-                    if result is None:
-                            logger.info(f"Creating node")
+                    cache_key = (query, tuple(sorted(property_data.items())))
+                    if cache_key in self._cache:
+                        result = self._cache.pop(cache_key)
+                        self._cache[cache_key] = result
+                        logger.debug("Using cached result")
+                    else:
+                        logger.info(query)
+                        result = session.execute_read(self._execute_query, query, property_data)
+                        self._cache[cache_key] = result
+                        logger.debug("Query executed and cached")
+
+                        if len(self._cache) > self._cache_limit:
+                            oldest_key, _ = self._cache.popitem(last=False)
+                            logger.debug(f"Cache limit reached, removed oldest key: {oldest_key}")
+
+                    if not result:
+                            #logger.info(f"Creating node")
                             #query = f"CREATE (n:{property_label} {{`name`: $property_name, `value`: $property_value, `value_min`: $property_value_min, `value_max`: $property_value_max,`unit`: $property_unit, `default_unit`: $default_unit}}) RETURN n"
                             query = f"""
                             CREATE (n:{property_label})
@@ -271,6 +277,7 @@ class Neo4jConnector:
                             """
                             logger.info(query)
                             result = session.execute_write(self._execute_query, query, property_data)
+                            self._cache[cache_key] = result
                             logger.info(result)
                     else:
                         logger.info(f"Nodes exist")
@@ -1023,7 +1030,6 @@ RETURN product
     
 
     def execute_query(self, query, properties={}):
-        print("services neo4j execute_query")
         with self.get_neo4j_session() as session:
             result = session.execute_write(self._execute_query_records, query, properties)
             return result
