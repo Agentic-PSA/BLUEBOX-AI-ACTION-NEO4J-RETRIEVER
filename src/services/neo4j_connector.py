@@ -16,8 +16,8 @@ class Neo4jConnector:
         self.units_converter = UnitConverter()
         self.client_gpt = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         self.embeddings_model = "text-embedding-3-small"
-        self._cache = OrderedDict()
-        self._cache_limit = 1000
+        _cache = OrderedDict()
+        _cache_limit = 1000
 
     def close(self):
         self.driver.close()
@@ -248,18 +248,18 @@ class Neo4jConnector:
                     query = f"MATCH (n:{property_label} {{`name`: $property_name, `value`: $property_value, `value_min`: $property_value_min, `value_max`: $property_value_max, `unit`: $property_unit}}) RETURN n"
 
                     cache_key = (query, tuple(sorted(property_data.items())))
-                    if cache_key in self._cache:
-                        result = self._cache.pop(cache_key)
-                        self._cache[cache_key] = result
+                    if cache_key in Neo4jConnector._cache:
+                        result = Neo4jConnector._cache.pop(cache_key)
+                        Neo4jConnector._cache[cache_key] = result
                         logger.debug("Using cached result")
                     else:
                         logger.info(query)
                         result = session.execute_read(self._execute_query, query, property_data)
-                        self._cache[cache_key] = result
+                        Neo4jConnector._cache[cache_key] = result
                         logger.debug("Query executed and cached")
 
-                        if len(self._cache) > self._cache_limit:
-                            oldest_key, _ = self._cache.popitem(last=False)
+                        if len(Neo4jConnector._cache) > Neo4jConnector._cache_limit:
+                            oldest_key, _ = Neo4jConnector._cache.popitem(last=False)
                             logger.debug(f"Cache limit reached, removed oldest key: {oldest_key}")
 
                     if not result:
@@ -277,7 +277,7 @@ class Neo4jConnector:
                             """
                             logger.info(query)
                             result = session.execute_write(self._execute_query, query, property_data)
-                            self._cache[cache_key] = result
+                            Neo4jConnector._cache[cache_key] = result
                             logger.info(result)
                     else:
                         logger.info(f"Nodes exist")
@@ -1010,7 +1010,7 @@ RETURN product
         WITH t, gds.similarity.cosine(queryVector, t.nameEmbedding) AS similarity
         RETURN t.code AS type_code, t.name AS type_name, similarity
         ORDER BY similarity DESC
-        LIMIT 20
+        LIMIT 5
         """
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
