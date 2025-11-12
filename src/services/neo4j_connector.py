@@ -10,14 +10,15 @@ from ..utils import UnitConverter
 from collections import OrderedDict
 
 class Neo4jConnector:
+    _cache = OrderedDict()
+    _cache_limit = 1000
+
     def __init__(self):
         uri = f'bolt://{os.environ.get("NEO4J_HOST")}:{os.environ.get("NEO4J_PORT")}'
         self.driver = GraphDatabase.driver(uri, auth=(os.environ.get("NEO4J_USER"), os.environ.get("NEO4J_PASSWORD")))
         self.units_converter = UnitConverter()
         self.client_gpt = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         self.embeddings_model = "text-embedding-3-small"
-        _cache = OrderedDict()
-        _cache_limit = 1000
 
     def close(self):
         self.driver.close()
