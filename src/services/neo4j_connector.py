@@ -53,6 +53,16 @@ class Neo4jConnector:
                 return self._serialize_node(result["n"])
             return None
 
+    def delete_product_and_relations(self, action: str):
+        try:
+            with self.get_neo4j_session() as session:
+                query = "MATCH (p:Product {action: $action}) DETACH DELETE p"
+                session.execute_write(self._execute_query, query, {"action": action})
+                return True
+        except Exception as e:
+            logger.error(f"Error in delete_product_and_relations: {e}")
+            return None
+
     def update_product_node(self, action: str, new_properties: dict):
         """
         Aktualizuje istniejący produkt po action.
