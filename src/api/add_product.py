@@ -33,7 +33,7 @@ class AddProduct(HTTPMethodView):
                 existing_version = existing_product.get('ProductVersion')
                 new_version = pim_data.get('ProductVersion')
                 if parse_version(new_version) == parse_version(existing_version):
-                    print("Produkt o takim action i wersji już istnieje")
+                    print("Produkt o takim action i wersji już istnieje",existing_product['action'], existing_version)
                     return JSONResponse(
                         body={"error": "Produkt o takim action i wersji już istnieje"},
                         status=409

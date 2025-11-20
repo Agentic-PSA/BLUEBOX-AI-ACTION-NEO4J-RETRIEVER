@@ -253,7 +253,87 @@ WYMAGANIA TECHNICZNE:
         return parse_json_with_multiline_strings(response_content)
 
 
+
 def generate_params(question, product_specification, labels):
+    print("services cypher_search generate_params")
+
+    # Zapytanie do LLM z elastycznym podejściem
+    prompt = f'''
+Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie parametry do zapytania bazy danych.
+
+1. Wypełnij pole "requiredProperties":
+   - Tylko te pola, których wartości są podane w pytaniu i które występują w specyfikacji dla danego typu produktu.
+   - Ustaw "unit" na null, jeśli nie jest potrzebne.
+   - W polu "value":
+     * jeśli użytkownik podał kilka wartości → lista,
+     * jeśli jedną wartość → pojedyncza wartość,
+     * liczby z przecinkiem zamień na kropkę.
+   - W polu "condition" ustaw znak warunku zgodnie z pytaniem (=, <, >, <=, >=, <>). 
+   - Nie wypełniaj pól niezwiązanych bezpośrednio z produktem (np. marka, model, producent).
+
+2. Wypełnij pole "price" (jeśli użytkownik pyta o cenę):
+   - Słownik z kluczami min, max, equal w zależności od tego, jakie wartości podano.
+   - Pole "currency" ustaw na podaną walutę lub PLN.
+
+3. Jednostki możliwe: m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
+
+4. Wartości atrybutów w specyfikacji:
+   - Jeśli atrybut ma klucz "unit" → podaj wartość liczbową i jednostkę.
+   - Jeśli atrybut ma klucz "values" → wybierz dokładną wartość z listy.
+
+5. Znajdź **wszystkie możliwe powiązania OR** między atrybutami:
+   - Podobieństwo nazw atrybutów (np. „Specyficzne potrzeby zwierzęcia” ↔ „Dodatkowe cechy”)
+   - Podobieństwo wartości (np. wspólne słowa kluczowe: „nadwaga”, „utrzymanie wagi”)
+   - Dla każdego atrybutu wstaw pole `"or_with"`: lista nazw powiązanych atrybutów które są w requiredProperties. Jeśli brak powiązań → pusty array.
+
+Pytanie użytkownika:
+{question}
+
+Specyfikacja produktu:
+{product_specification}
+
+Odpowiedz w poprawnym formacie JSON:
+{{
+  "requiredProperties": [
+    {{
+      "name": "property_name",
+      "value": 5,
+      "unit": "kg",
+      "condition": "=",
+      "or_with": ["property_name_2", "property_name_4"]
+    }},
+    {{
+      "name": "property_name1",
+      "value": "wartość",
+      "unit": null,
+      "condition": "=",
+      "or_with": []
+    }}
+  ],
+  "price": {{
+    "min": 100,
+    "max": 1000,
+    "equal": 500,
+    "currency": "PLN"
+  }}
+}}
+    '''
+    print('PROMPT LEN: ', len(prompt))
+    # print(product_specification)
+    #response_content = response_text.replace('```', '').replace('json', '')
+    #print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
+    #print(prompt)
+    #print('BBBBBBBBBB________________________BBBBBBBBBBBBBBBBBBBBBBB')
+    response_text = llm(prompt)
+    params = json.loads(response_text)
+    #print('----------------response--------------')
+    #print(params)
+    # params["productTypes"] = labels
+    return params
+
+
+
+def generate_params_OLD(question, product_specification, labels):
     print("services cypher_search generate_params")
 
     # Zapytanie do LLM z elastycznym podejściem
@@ -302,6 +382,13 @@ Specyfikacji produktu jest postaci:
 W specyfikacji produktu, dla każdego atrybutu występuje klucz unit lub values.
 Jeśli występuje klucz unit, należy dobrać wartość.
 Jeśli wystepuje klucz values, należy wybrać z dostępnych opcji (zachowaj dokładne dopasowanie, nie zmieniaj wielkości liter)
+W otrzymanych wynikach znajdź **wszystkie atrybuty, które mogą być traktowane zamiennie (OR)**, na podstawie:
+1. **Podobieństwa nazw** atrybutów (np. „Specyficzne potrzeby zwierzęcia” i „Dodatkowe cechy” mogą być powiązane, jeśli odnoszą się do tego samego zagadnienia)
+2. **Podobieństwa wartości** atrybutów (np. jeśli wartości zawierają te same słowa kluczowe, np. „nadwaga”, „utrzymanie wagi”).
+- Dla każdego atrybutu dodaj pole `"or_with"`: lista nazw innych atrybutów, z którymi może być powiązany.  
+- Jeśli nie ma powiązań, pole `"or_with"` powinno być pustą tablicą 
+- Nie dodawaj powiązań, które nie mają sensu.  
+
 
 Pytanie użytkownika:
 {question}
@@ -315,38 +402,44 @@ Odpowiedz w formacie json:
     {{
       "name": "property_name",
       "value": 5,
-      "unit": "kg"
-      "condition": "="
+      "unit": "kg",
+      "condition": "=",
+      "or_with": ["property_name_2", "property_name_4"]
     }},
     {{
       "name": "property_name1",
       "value": "wartość",
-      "unit": null
-      "condition": "="
+      "unit": null,
+      "condition": "=",
+      "or_with": []
     }},
     {{
       "name": "property_name2",
       "value": "wartość",
-      "unit": null
-      "condition": "<>"
+      "unit": null,
+      "condition": "<>",
+      "or_with": ["property_name"]
     }},
     {{
       "name": "property_name3",
       "value": ["wartość 1", "wartość 2", "wartość 3"],
-      "unit": null
-      "condition": "="
+      "unit": null,
+      "condition": "=",
+      "or_with": []
     }},
     {{
       "name": "property_name4",
       "value": 50,
-      "unit": "in"
-      "condition": ">="
+      "unit": "in",
+      "condition": ">=",
+      "or_with": ["property_name"]
     }},
     {{
-      "name": "property_name4",
+      "name": "property_name5",
       "value": 0.004,
-      "unit": "GWh"
-      "condition": "<="
+      "unit": "GWh",
+      "condition": "<=",
+      "or_with": []
     }},
   ],
   "price": {{
@@ -371,10 +464,11 @@ Odpowiedz w formacie json:
     return params
 
 
-def exec_query(params, return_parameters=False):
+def exec_query_ORYG(params, return_parameters=False):
     print("services cypher_search exec_query")
     price_query = ""
     price = params.get("price")
+
     if price:
         currency = params.get("currency", "PLN")
         if price.get("equal"):
@@ -435,6 +529,164 @@ RETURN product
             if record.get("productNumberEmbedding"):
                 del record["productNumberEmbedding"]
         return results
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def build_or_groups(required_props):
+    """
+    Tworzy listę grup:
+    - Każda grupa z połączeń OR -> lista nazw właściwości
+    - Właściwości bez połączeń OR -> grupa jednoelementowa (AND)
+    """
+    groups = []
+    visited = set()
+
+    for prop in required_props:
+        name = prop["name"]
+        if name in visited:
+            continue
+
+        or_with = prop.get("or_with", [])
+        if not or_with:  # brak powiązań → osobna grupa
+            groups.append([name])
+            visited.add(name)
+            continue
+
+        # budujemy grupę OR
+        group = {name}
+        stack = [prop]
+        while stack:
+            p = stack.pop()
+            visited.add(p["name"])
+            for other in required_props:
+                other_name = other["name"]
+                if other_name in visited:
+                    continue
+                if other_name in p.get("or_with", []) or p["name"] in other.get("or_with", []):
+                    group.add(other_name)
+                    stack.append(other)
+        groups.append(list(group))
+    return groups
+
+
+def exec_query(params, return_parameters=False):
+    return_parameters = True
+    print("services cypher_search exec_query")
+    price_query = ""
+    price = params.get("price")
+
+    if price:
+        currency = params.get("currency", "PLN")
+        if price.get("equal"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price {{value: {price.get("equal")}, currency: "{currency}"}})'
+        elif price.get("min") and price.get("max"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.value <= {price.get("max")} AND price.currency = "{currency}"'
+        elif price.get("min"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.currency = "{currency}"'
+        elif price.get("max"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value <= {price.get("max")} AND price.currency = "{currency}"'
+
+    required_props = params.get("requiredProperties", [])
+    or_groups = build_or_groups(required_props)  # automatycznie generuje OR-grupy
+
+    cypher_query = """
+MATCH (product:Product)
+WHERE any(label in $productTypes WHERE label IN labels(product))
+OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
+"""
+    cypher_query += price_query
+    cypher_query += """
+WITH product, collect({
+  name: prop.name,
+  value: prop.value,
+  unit: prop.unit
+}) AS properties
+
+WHERE size([
+  group IN $orGroups WHERE
+    size([
+      reqProp IN $requiredProperties WHERE
+        reqProp.name IN group AND size([
+          prop IN properties WHERE
+            toLower(prop.name) = toLower(reqProp.name) AND
+            (
+              (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toLower(toString(prop.value)) IN reqProp.value) OR
+              (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
+              (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
+              (reqProp.condition = '<' AND prop.value < reqProp.value) OR
+              (reqProp.condition = '>' AND prop.value > reqProp.value) OR
+              (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
+              (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
+              ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
+              ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'INTEGER' AND apoc.meta.cypher.type(prop.value) = 'STRING' AND prop.value STARTS WITH toString(reqProp.value)) OR
+              ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
+            ) AND
+            (reqProp.unit IS NULL OR prop.unit = reqProp.unit)
+        ]) > 0
+    ]) > 0
+]) = size($orGroups)
+
+RETURN product
+"""
+    if return_parameters:
+        cypher_query += ", properties"
+
+    print(cypher_query)
+    print(params)
+
+    # wysyłamy parametry do Neo4j
+    neo4j_params = params.copy()
+    neo4j_params["orGroups"] = or_groups
+
+    with driver.session() as session:
+        result = session.run(cypher_query, neo4j_params)
+        records = list(result)
+        if not len(records):
+            print("Brak wyników")
+        results = [record.data().get("product", {}) for record in records]
+        for record in results:
+            if record.get("nameEmbedding"):
+                del record["nameEmbedding"]
+            if record.get("productNumberEmbedding"):
+                del record["productNumberEmbedding"]
+        return results
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def get_embedding(text, model="text-embedding-3-small"):
     print("services cypher_search get_embedding")
@@ -722,8 +974,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 specification = arr[0]
                 mapping = arr[1]
                 categories = arr[2]
+                excludes = arr[3]
                 if specification:
-                    specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, t)
+                    specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, excludes, t)
                     specifications[type_to_label(t)] = specification
             end = time.time()
             logger.info(f"Pobieranie specyfikacji 1: {end - start} s")
@@ -967,8 +1220,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             specification = arr[0]
             mapping = arr[1]
             categories = arr[2]
+            excludes = arr[3]
             if specification:
-                specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, t)
+                specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, excludes, t)
                 specifications[type_to_label(t)] = specification
         end = time.time()
         logger.info(f"Pobieranie specyfikacji 2: {end - start} s")
