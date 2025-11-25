@@ -270,21 +270,34 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
      * liczby z przecinkiem zamień na kropkę.
    - W polu "condition" ustaw znak warunku zgodnie z pytaniem (=, <, >, <=, >=, <>). 
    - Nie wypełniaj pól niezwiązanych bezpośrednio z produktem (np. marka, model, producent).
+   - Jeśli użytkownik pyta o parametr, który w specyfikacji jest rozbity na kilka osobnych atrybutów powiązanych, dodaj wszystkie te powiązane atrybuty do requiredProperties
 
-2. Wypełnij pole "price" (jeśli użytkownik pyta o cenę):
+2. Pomijaj parametry wynikające z nazwy kategorii
+   - Nie dodawaj do requiredProperties parametrów, których wartość jest już zawarta w nazwie kategorii produktu.
+   - Jeśli jednak dana cecha nie występuje w nazwie kategorii, ale występuje:
+    * w pytaniu użytkownika lub
+    * w specyfikacji produktu jako możliwa opcja
+      → to parametr wolno dodać.
+
+3. Wypełnij pole "price" (jeśli użytkownik pyta o cenę):
    - Słownik z kluczami min, max, equal w zależności od tego, jakie wartości podano.
    - Pole "currency" ustaw na podaną walutę lub PLN.
 
-3. Jednostki możliwe: m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
+4. Jednostki możliwe: m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
 
-4. Wartości atrybutów w specyfikacji:
+5. Wartości atrybutów w specyfikacji:
    - Jeśli atrybut ma klucz "unit" → podaj wartość liczbową i jednostkę.
-   - Jeśli atrybut ma klucz "values" → wybierz dokładną wartość z listy.
+   - Jeśli atrybut ma klucz "values" → wybierz wszystkie pasujące wartości z listy (nie poprawiaj wielkości liter, błędów, odmiany ani stylu - tekst ma zostać skopiowany 1:1, nawet jeśli wygląda niepoprawnie)
+   - Jeśli atrybut ma klucz "values", a nazwa atrybutu lub wartości wskazują na dane zakresowe → pomiń go
 
-5. Znajdź **wszystkie możliwe powiązania OR** między atrybutami:
+6. Znajdź **wszystkie możliwe powiązania OR** między **znalezionymi** atrybutami:
    - Podobieństwo nazw atrybutów (np. „Specyficzne potrzeby zwierzęcia” ↔ „Dodatkowe cechy”)
    - Podobieństwo wartości (np. wspólne słowa kluczowe: „nadwaga”, „utrzymanie wagi”)
    - Dla każdego atrybutu wstaw pole `"or_with"`: lista nazw powiązanych atrybutów które są w requiredProperties. Jeśli brak powiązań → pusty array.
+   - Powiązania OR twórz WYŁĄCZNIE pomiędzy atrybutami, które znalazły się w requiredProperties. 
+   - Nigdy nie analizuj ani nie wykorzystuj atrybutów, które nie zostały wybrane.
+
+7. W polu advice wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych.
 
 Pytanie użytkownika:
 {question}
@@ -315,10 +328,12 @@ Odpowiedz w poprawnym formacie JSON:
     "max": 1000,
     "equal": 500,
     "currency": "PLN"
-  }}
+  }},
+  "advice": "Twoja sugestia na poprawienie zapytania"
 }}
     '''
     print('PROMPT LEN: ', len(prompt))
+    #print(json.dumps(product_specification, indent=4, ensure_ascii=False))
     # print(product_specification)
     #response_content = response_text.replace('```', '').replace('json', '')
     #print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
@@ -576,12 +591,12 @@ def build_or_groups(required_props):
                 if other_name in p.get("or_with", []) or p["name"] in other.get("or_with", []):
                     group.add(other_name)
                     stack.append(other)
+                    visited.add(other_name) #usun, jesli ma byc relacja dwustronna
         groups.append(list(group))
     return groups
 
 
 def exec_query(params, return_parameters=False):
-    return_parameters = True
     print("services cypher_search exec_query")
     price_query = ""
     price = params.get("price")
@@ -636,19 +651,18 @@ WHERE size([
         ]) > 0
     ]) > 0
 ]) = size($orGroups)
-
 RETURN product
 """
     if return_parameters:
         cypher_query += ", properties"
 
-    print(cypher_query)
-    print(params)
+
 
     # wysyłamy parametry do Neo4j
     neo4j_params = params.copy()
     neo4j_params["orGroups"] = or_groups
-
+    print(cypher_query)
+    print(neo4j_params)
     with driver.session() as session:
         result = session.run(cypher_query, neo4j_params)
         records = list(result)
@@ -757,7 +771,8 @@ def filter_types(user_query, types_response):
     print("services cypher_search filter_types")
     prompt = f'''
 Określ, których z podanych typów produktów może dotyczyć pytanie użytkownika.
-W odpowiedzi podaj listę type_code.
+W odpowiedzi podaj listę type_code (wybierz tylko 1 typ, ten najbardziej pasujący).
+Musisz jakiś wybrać.
 Typy:
 {types_response}
 
@@ -937,8 +952,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             logger.debug(types)
             data["types"] = types
             end = time.time()
-            logger.info(f"Wyszukiwanie typów produktów: {end - start} s")
-            times["Wyszukiwanie typów produktów"] = end - start
+            logger.info(f"Wyszukiwanie typów produktów 1: {end - start} s")
+            times["Wyszukiwanie typów produktów 1"] = end - start
         except Exception as e:
             return {
                 "success": False,
@@ -953,8 +968,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             data["types"] = types
             end = time.time()
             logger.debug(data)
-            logger.info(f"Filtrowanie typów produktów: {end - start} s")
-            times["Filtrowanie typów produktów"] = end - start
+            logger.info(f"Filtrowanie typów produktów 1: {end - start} s")
+            times["Filtrowanie typów produktów 1"] = end - start
         except Exception as e:
             return {
                 "success": False,
@@ -975,8 +990,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 mapping = arr[1]
                 categories = arr[2]
                 excludes = arr[3]
+                category_type = arr[4]
                 if specification:
-                    specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, excludes, t)
+                    specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, excludes, t, category_type)
                     specifications[type_to_label(t)] = specification
             end = time.time()
             logger.info(f"Pobieranie specyfikacji 1: {end - start} s")
@@ -997,8 +1013,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 params = generate_params(user_query, specifications, types)
                 params = filter_none_params(params)
                 end = time.time()
-                logger.info(f"Generowanie parametrów cypher: {end - start} s")
-                times["Generowanie parametrów cypher"] = end - start
+                logger.info(f"Generowanie parametrów cypher 1: {end - start} s")
+                times["Generowanie parametrów cypher 1"] = end - start
             except Exception as e:
                 return {
                     "success": False,
@@ -1180,8 +1196,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         #price_response = self.neo4j.get_product_price(action_code, currency)
         types = [t["type_code"] for t in types_response]
         end = time.time()
-        logger.info(f"Wyszukiwanie typów produktów: {end - start} s")
-        times["Wyszukiwanie typów produktów"] = end - start
+        logger.info(f"Wyszukiwanie typów produktów 2: {end - start} s")
+        times["Wyszukiwanie typów produktów 2"] = end - start
     except Exception as e:
         return {
             "success": False,
@@ -1199,8 +1215,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         types = [type_to_label(t) for t in types]
         end = time.time()
         logger.debug(data)
-        logger.info(f"Filtrowanie typów produktów: {end - start} s")
-        times["Filtrowanie typów produktów"] = end - start
+        logger.info(f"Filtrowanie typów produktów 2: {end - start} s")
+        times["Filtrowanie typów produktów 2"] = end - start
     except Exception as e:
         return {
             "success": False,
@@ -1221,8 +1237,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             mapping = arr[1]
             categories = arr[2]
             excludes = arr[3]
+            category_type = arr[4]
             if specification:
-                specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, excludes, t)
+                specification = src.services.product_specification.filter_language(specification, "PL", mapping, categories, excludes, t, category_type)
                 specifications[type_to_label(t)] = specification
         end = time.time()
         logger.info(f"Pobieranie specyfikacji 2: {end - start} s")
@@ -1242,8 +1259,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         params = generate_params(user_query, specifications, types)
         params = filter_none_params(params)
         end = time.time()
-        logger.info(f"Generowanie parametrów cypher: {end - start} s")
-        times["Generowanie parametrów cypher"] = end - start
+        logger.info(f"Generowanie parametrów cypher2 : {end - start} s")
+        times["Generowanie parametrów cypher 2"] = end - start
     except Exception as e:
         return {
             "success": False,
@@ -1255,8 +1272,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     start = time.time()
     params_values = get_params_values(params, types)
     end = time.time()
-    logger.info(f"Znalezienie możliwych wartości parametrów: {end - start} s")
-    times["Znalezienie możliwych wartości parametrów"] = end - start
+    logger.info(f"Znalezienie możliwych wartości parametrów 2: {end - start} s")
+    times["Znalezienie możliwych wartości parametrów 2"] = end - start
     logger.info(params_values)
 
     if params_values:
