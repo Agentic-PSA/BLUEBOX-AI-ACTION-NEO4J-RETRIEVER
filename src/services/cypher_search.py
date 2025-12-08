@@ -7,9 +7,11 @@ import time
 import json
 from py2neo import Graph
 import openai
+import google.generativeai as genai
 from neo4j import GraphDatabase, Result
 from sanic import Sanic
 from sanic.log import logger
+from copy import deepcopy
 
 import src.services.product_specification
 import src.services.db_schema
@@ -24,10 +26,24 @@ driver = GraphDatabase.driver(uri, auth=(os.environ.get("NEO4J_USER"), os.enviro
 client_gpt = openai.OpenAI(
    api_key="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")
 
-
+def clean_json(text: str):
+    if text is None:
+        return ""
+    text = text.strip()
+    # usuń ```json ... ```
+    if text.startswith("```"):
+        text = text.strip("`")
+        # usuń ewentualny prefiks json
+        text = text.replace("json", "", 1).strip()
+    return text
 
 def llm(prompt, model="gpt-4.1"):
+    #return llm_gemini(prompt)
     print("services cypher_search llm")
+    print("-------------")
+    print(model)
+    print(prompt)
+    print("-------------")
     response = client_gpt.chat.completions.create(
         model=model,
         # reasoning_effort='high',
@@ -37,7 +53,40 @@ def llm(prompt, model="gpt-4.1"):
     logger.debug(response)
     response_text = response.choices[0].message.content
     logger.debug(response_text)
+    # print("-------------")
+    # print(response_text)
+    # print("-------------")
     return response_text
+
+def llm_gemini(prompt):
+    print("services cypher_search llm gemini")
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise ValueError(
+            "Brak klucza Google Gemini. Podaj go jako parametr lub ustaw zmienną środowiskową GEMINI_API_KEY")
+    genai.configure(api_key=api_key)
+    
+    # print('------------------')
+    # for m in genai.list_models():
+    #     print(m.name, m.supported_generation_methods)
+    # print('------------------')
+    # exit()
+    model = genai.GenerativeModel("models/gemini-2.5-pro")
+    response = model.generate_content(
+        prompt,
+        safety_settings=None,  # opcjonalnie usunięcie filtrów bezpieczeństwa
+        generation_config={
+            "temperature": 0.0,
+            "max_output_tokens": 30000
+        }
+    )
+    raw_text = response.text
+    cleaned = clean_json(raw_text)    
+    # print("-------------")
+    # print(cleaned)
+    # print("-------------")
+    return cleaned
+
 
 def search_index(names=[]):
     print("services cypher_search search_index")
@@ -254,7 +303,52 @@ WYMAGANIA TECHNICZNE:
 
 
 
-def generate_params(question, product_specification, labels):
+
+def merge_sections(data):
+    merged = {}
+
+    for category, sections in data.items():
+        for section in sections:
+            section_name = section["section_name"]
+
+            # jeśli pierwszy raz widzimy sekcję, kopiujemy ją w całości
+            if section_name not in merged:
+                merged[section_name] = deepcopy(section)
+                continue
+
+            # scalanie atrybutów
+            existing_attrs = merged[section_name]["attributes"]
+
+            for attr in section["attributes"]:
+                attr_name = next(iter(attr))
+                attr_value = attr[attr_name]
+
+                # znajdź istniejący atrybut
+                existing = next((a for a in existing_attrs if attr_name in a), None)
+
+                if not existing:
+                    # jeśli nie ma, dodaj nowy
+                    existing_attrs.append(deepcopy(attr))
+                    continue
+
+                # scalanie istniejącego
+                existing_value = existing[attr_name]
+
+                # scalanie słowników (unit/min/max itp.)
+                for key, val in attr_value.items():
+                    if key == "values":
+                        # scalanie wartości + usunięcie duplikatów + normalizacja spacji
+                        combined = set(v.strip() for v in existing_value.get("values", []) + val)
+                        existing_value["values"] = list(combined)
+                    else:
+                        # inne pola nadpisujemy lub dodajemy
+                        existing_value[key] = val
+
+    # zwróć listę sekcji
+    return list(merged.values())
+
+
+def generate_params(question, product_specification):
     print("services cypher_search generate_params")
 
     # Zapytanie do LLM z elastycznym podejściem
@@ -286,7 +380,7 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
 4. Jednostki możliwe: m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
 
 5. Wartości atrybutów w specyfikacji:
-   - Jeśli atrybut ma klucz "unit" → podaj wartość liczbową i jednostkę.
+   - Jeśli atrybut ma klucz "unit" → podaj wartość liczbową i jednostkę
    - Jeśli atrybut ma klucz "values" → wybierz wszystkie pasujące wartości z listy (nie poprawiaj wielkości liter, błędów, odmiany ani stylu - tekst ma zostać skopiowany 1:1, nawet jeśli wygląda niepoprawnie)
    - Jeśli atrybut ma klucz "values", a nazwa atrybutu lub wartości wskazują na dane zakresowe → pomiń go
 
@@ -297,13 +391,22 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
    - Powiązania OR twórz WYŁĄCZNIE pomiędzy atrybutami, które znalazły się w requiredProperties. 
    - Nigdy nie analizuj ani nie wykorzystuj atrybutów, które nie zostały wybrane.
 
-7. W polu advice wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych.
+7. Jeśli ten sam atrybut w specyfikacji występuje kilka razy w różnych jednostkach (np. kg i g) ale pod tą samą nazwą:
+   ZASADA JEDNEGO PARAMETRU (OBOWIĄZKOWA — NIE WOLNO NARUSZYĆ):
+   - Traktuj je jako JEDEN parametr i wybierz tylko jeden wariant.
+     * Jeśli użytkownik poda jednostkę → wybierz wariant w tej jednostce.
+     * Jeśli użytkownik nie poda jednostki → wybierz jednostkę wyższą w hierarchii (np. kg > g, m > cm > mm).
+   - Nigdy nie dodawaj więcej niż jednego wariantu tego parametru do requiredProperties.
+   - Nigdy nie twórz OR pomiędzy wariantami tego samego parametru (różne jednostki lub formaty nazwy).
+     OR może łączyć wyłącznie różne parametry, nigdy alternatywne wersje jednego parametru.
+
+8. W polu advice wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych.
 
 Pytanie użytkownika:
 {question}
 
 Specyfikacja produktu:
-{product_specification}
+{merge_sections(product_specification)}
 
 Odpowiedz w poprawnym formacie JSON:
 {{
@@ -332,6 +435,7 @@ Odpowiedz w poprawnym formacie JSON:
   "advice": "Twoja sugestia na poprawienie zapytania"
 }}
     '''
+
     print('PROMPT LEN: ', len(prompt))
     #print(json.dumps(product_specification, indent=4, ensure_ascii=False))
     # print(product_specification)
@@ -656,12 +760,10 @@ RETURN product
     if return_parameters:
         cypher_query += ", properties"
 
-
-
     # wysyłamy parametry do Neo4j
     neo4j_params = params.copy()
     neo4j_params["orGroups"] = or_groups
-    print(cypher_query)
+    #print(cypher_query)
     print(neo4j_params)
     with driver.session() as session:
         result = session.run(cypher_query, neo4j_params)
@@ -771,8 +873,8 @@ def filter_types(user_query, types_response):
     print("services cypher_search filter_types")
     prompt = f'''
 Określ, których z podanych typów produktów może dotyczyć pytanie użytkownika.
-W odpowiedzi podaj listę type_code (wybierz tylko 1 typ, ten najbardziej pasujący).
-Musisz jakiś wybrać.
+W odpowiedzi podaj listę type_code.
+Musisz wybrać co najmniej jeden type_code.
 Typy:
 {types_response}
 
@@ -870,8 +972,8 @@ def correct_generated_params(params, params_values, user_query):
 
 def get_incorrect_params(params, params_values):
     print("services cypher_search get_incorrect_params")
-    print(params)
-    print(params_values)
+    #print(params)
+    #print(params_values)
     properties = params.get('requiredProperties', [])
     incorrect_params = []
     for property in properties:
@@ -1001,7 +1103,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         except Exception as e:
             return {
                 "success": False,
-                "message": f"Błąd podczas pobierania specyfikacji produktów: {str(e)}",
+                "message": f"Błąd podczas pobierania specyfikacji produktów 1: {str(e)}",
                 "times": times,
                 "types": types_response,
                 "time": sum(times.values())
@@ -1010,7 +1112,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         if params_search:
             try:
                 start = time.time()
-                params = generate_params(user_query, specifications, types)
+                params = generate_params(user_query, specifications)
                 params = filter_none_params(params)
                 end = time.time()
                 logger.info(f"Generowanie parametrów cypher 1: {end - start} s")
@@ -1248,7 +1350,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     except Exception as e:
         return {
             "success": False,
-            "message": f"Błąd podczas pobierania specyfikacji produktów: {str(e)}",
+            "message": f"Błąd podczas pobierania specyfikacji produktów 2: {str(e)}",
             "times": times,
             "types": types_response,
             "time": sum(times.values())
@@ -1256,7 +1358,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
 
     try:
         start = time.time()
-        params = generate_params(user_query, specifications, types)
+        params = generate_params(user_query, specifications)
         params = filter_none_params(params)
         end = time.time()
         logger.info(f"Generowanie parametrów cypher2 : {end - start} s")
@@ -1274,7 +1376,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     end = time.time()
     logger.info(f"Znalezienie możliwych wartości parametrów 2: {end - start} s")
     times["Znalezienie możliwych wartości parametrów 2"] = end - start
-    logger.info(params_values)
+    #logger.info(params_values)
 
     if params_values:
         incorrect_params = get_incorrect_params(params, params_values)

@@ -9,3 +9,4 @@ py2neo
 python-dotenv
 psycopg2-binary
 spacy
+google-generativeai

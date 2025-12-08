@@ -105,6 +105,7 @@ def get_form_data(column: str, value: str, table: str= 'forms') -> dict:
         raise
 
 def get_product_specification(type):
+    print("services product_specification get_product_specification", type)
     category = get_form_data('category', type, table='category_to_type')
     spec_data = get_form_data('category', category.get('type'), table='forms')
     return [spec_data['form_with_values'][0]['value'], spec_data['values_map'], spec_data['categories'], category['search_excludes'], category.get('type')]
@@ -136,7 +137,7 @@ def filter_language(specification, language="PL", mapping={}, categories={}, exc
                 if categories[section_name][attribute]:
                     if category not in categories[section_name][attribute]:
                         if category_type != category_in:
-                            print("USUWAM 1",section_name,attribute)
+                            #print("USUWAM 1",section_name,attribute)
                             continue
             #usun nieistotne parametry
             if section_name in excludes:
@@ -144,7 +145,7 @@ def filter_language(specification, language="PL", mapping={}, categories={}, exc
                     exclude_value = excludes[section_name][attribute]
                     if exclude_value:
                         if category_type != category_in:
-                            print("USUWAM 2",section_name,attribute)
+                            #print("USUWAM 2",section_name,attribute)
                             continue
 
             mapping_section = mapping.get(section_name, {})
