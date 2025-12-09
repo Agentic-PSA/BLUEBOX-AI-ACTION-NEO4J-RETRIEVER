@@ -740,7 +740,7 @@ WHERE size([
           prop IN properties WHERE
             toLower(prop.name) = toLower(reqProp.name) AND
             (
-              (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toLower(toString(prop.value)) IN reqProp.value) OR
+              (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toString(prop.value) IN reqProp.value) OR
               (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
               (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
               (reqProp.condition = '<' AND prop.value < reqProp.value) OR
