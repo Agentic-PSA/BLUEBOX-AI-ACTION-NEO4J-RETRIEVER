@@ -365,6 +365,7 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
      * jeśli jedną wartość → pojedyncza wartość,
      * liczby z przecinkiem zamień na kropkę.
    - W polu "condition" ustaw znak warunku zgodnie z pytaniem (=, <, >, <=, >=, <>). 
+   - Jeśli mamy dane zakresowe, np. większy od A ale mniejszy od B, rozbij to na dwa warunki
    - Nie wypełniaj pól niezwiązanych bezpośrednio z produktem (np. marka, model, producent).
    - Jeśli użytkownik pyta o parametr, który w specyfikacji jest rozbity na kilka osobnych atrybutów powiązanych, dodaj wszystkie te powiązane atrybuty do requiredProperties
 
@@ -1403,6 +1404,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             times["Poprawienie parametrów"] = end - start
             logger.info(params)
 
+    #obsluga mapowania
+    params = extend_required_properties(mapping, params)
     #dodanie informacji o typach, które pyta cypher
     params["productTypes"] = types
 
@@ -1441,6 +1444,59 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         "types_query": types_query,
         "time": sum(times.values())
     }
+
+def extend_required_properties(mapping, params):
+    print(params)
+    for prop in params.get("requiredProperties", []):
+        original_values = prop.get("value")
+        prop_name = prop.get("name")  # nazwa sekcji, z którą ma się zgadzać
+
+        # 🛑 Jeśli wartość nie jest tekstem ani listą → pomiń
+        if isinstance(original_values, (int, float, bool)) or original_values is None:
+            continue
+
+        # 🟦 Normalizacja na listę
+        if isinstance(original_values, str):
+            original_values_list = [original_values]
+        elif isinstance(original_values, list):
+            original_values_list = [v for v in original_values if isinstance(v, str)]
+            if not original_values_list:
+                continue
+        else:
+            continue  # np. dict → pomijamy
+
+        extended = set(original_values_list)
+        found_extra = False
+
+        # 🔍 Iteracja po wszystkich sekcjach w mapping
+        for section_group_name, section_group in mapping.items():
+            if not isinstance(section_group, dict):
+                continue
+
+            for section_name, section in section_group.items():
+                if not isinstance(section, dict):
+                    continue
+                # 🔹 tylko sekcje z unit == "" i name pasującym do prop_name
+                if section.get("unit") != "" or section_name != prop_name:
+                    continue
+
+                values_dict = section.get("values", {})
+                for key, value_list in values_dict.items():
+                    for val in original_values_list:
+                        if val in value_list:  # substring match można dodać tutaj
+                            extended.add(key)
+                            found_extra = True
+                            print(f"extend_required_properties - dodaje w {section_name} wartosc {key} dla {val}")
+
+        extended_list = list(extended)
+
+        # ✔️ Jeśli nic nie dodano i tylko jedna wartość → wraca string
+        if not found_extra and len(extended_list) == 1:
+            prop["value"] = extended_list[0]
+        else:
+            prop["value"] = extended_list
+
+    return params
 
 
 def type_to_label(t: str):
