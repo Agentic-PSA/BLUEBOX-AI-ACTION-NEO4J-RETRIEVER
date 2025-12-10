@@ -40,10 +40,12 @@ def clean_json(text: str):
 def llm(prompt, model="gpt-4.1"):
     #return llm_gemini(prompt)
     print("services cypher_search llm")
-    print("-------------")
-    print(model)
-    print(prompt)
-    print("-------------")
+    model = "gpt-4.1-mini"
+    #model = "gpt-4.1-nano"
+    # print("-------------")
+    # print(model)
+    # print(prompt)
+    # print("-------------")
     response = client_gpt.chat.completions.create(
         model=model,
         # reasoning_effort='high',
@@ -400,7 +402,8 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
    - Nigdy nie twórz OR pomiędzy wariantami tego samego parametru (różne jednostki lub formaty nazwy).
      OR może łączyć wyłącznie różne parametry, nigdy alternatywne wersje jednego parametru.
 
-8. W polu advice wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych.
+8. W polu advice1 wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych
+9. W polu advice2 wpisz informację, co możemy poprawić aby Twoja odpowiedź była szybsza (teraz odpowiadasz w zakresie 8-15 sekund, a powinieneś w max 5 sekund)
 
 Pytanie użytkownika:
 {question}
@@ -432,11 +435,12 @@ Odpowiedz w poprawnym formacie JSON:
     "equal": 500,
     "currency": "PLN"
   }},
-  "advice": "Twoja sugestia na poprawienie zapytania"
+  "advice1": "Twoja sugestia na poprawienie zapytania - tematy jakościowe",
+  "advice2": "Twoja sugestia na poprawienie zapytania - tematy szybkości odpowiedzi",
 }}
     '''
 
-    print('PROMPT LEN: ', len(prompt))
+    print('PROMPT LEN: ', len(prompt), len(product_specification))
     #print(json.dumps(product_specification, indent=4, ensure_ascii=False))
     # print(product_specification)
     #response_content = response_text.replace('```', '').replace('json', '')
@@ -1139,6 +1143,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                     original_params = params
                     start = time.time()
                     corrected_params = correct_generated_params(incorrect_params, params_values, user_query)
+                    logger.info(f"incorrect_params: {incorrect_params}")
                     logger.info(f"corrected_params: {corrected_params}")
                     corrected_params_dict = {}
                     for param in corrected_params:
@@ -1385,6 +1390,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             original_params = params
             start = time.time()
             corrected_params = correct_generated_params(incorrect_params, params_values, user_query)
+            logger.info(f"incorrect_params: {incorrect_params}")
             logger.info(f"corrected_params: {corrected_params}")
             corrected_params_dict = {}
             for param in corrected_params:
