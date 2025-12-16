@@ -89,6 +89,8 @@ class UnitConverter:
             unit = 'in'
         # 🔹 Jeśli mamy zakres np. "10-20", "10/20/30", "10-20-30"
         if isinstance(value, str):
+            if re.search(r"\d+\s*[xX×]\s*\d+", value):
+                return {unit: {"min": value, "max": value}}
             numbers = re.findall(r"[-+]?\d*\.?\d+", value)
             if len(numbers) > 1:
                 nums = [float(n) for n in numbers]
