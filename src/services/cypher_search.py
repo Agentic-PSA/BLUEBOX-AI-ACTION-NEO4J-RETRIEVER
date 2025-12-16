@@ -1036,8 +1036,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         data = analize_query(user_query)
         end = time.time()
         logger.debug(data)
-        logger.info(f"Analiza pytania: {end - start} s")
-        times["Analiza pytania"] = end - start
+        logger.info(f"Analiza pytania (AI): {end - start} s")
+        times["Analiza pytania (AI)"] = end - start
     except Exception as e:
         return {
             "success": False,
@@ -1075,8 +1075,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             data["types"] = types
             end = time.time()
             logger.debug(data)
-            logger.info(f"Filtrowanie typów produktów 1: {end - start} s")
-            times["Filtrowanie typów produktów 1"] = end - start
+            logger.info(f"Filtrowanie typów produktów 1 (AI): {end - start} s")
+            times["Filtrowanie typów produktów 1 (AI)"] = end - start
         except Exception as e:
             return {
                 "success": False,
@@ -1120,8 +1120,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
                 params = generate_params(user_query, specifications)
                 params = filter_none_params(params)
                 end = time.time()
-                logger.info(f"Generowanie parametrów cypher 1: {end - start} s")
-                times["Generowanie parametrów cypher 1"] = end - start
+                logger.info(f"Generowanie parametrów cypher 1 (AI): {end - start} s")
+                times["Generowanie parametrów cypher 1 (AI)"] = end - start
             except Exception as e:
                 return {
                     "success": False,
@@ -1323,8 +1323,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         types = [type_to_label(t) for t in types]
         end = time.time()
         logger.debug(data)
-        logger.info(f"Filtrowanie typów produktów 2: {end - start} s")
-        times["Filtrowanie typów produktów 2"] = end - start
+        logger.info(f"Filtrowanie typów produktów 2 (AI): {end - start} s")
+        times["Filtrowanie typów produktów 2 (AI)"] = end - start
     except Exception as e:
         return {
             "success": False,
@@ -1367,8 +1367,8 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         params = generate_params(user_query, specifications)
         params = filter_none_params(params)
         end = time.time()
-        logger.info(f"Generowanie parametrów cypher2 : {end - start} s")
-        times["Generowanie parametrów cypher 2"] = end - start
+        logger.info(f"Generowanie parametrów cypher2 (AI): {end - start} s")
+        times["Generowanie parametrów cypher 2 (AI)"] = end - start
     except Exception as e:
         return {
             "success": False,

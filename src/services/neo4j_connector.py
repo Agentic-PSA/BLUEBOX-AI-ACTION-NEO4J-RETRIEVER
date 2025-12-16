@@ -150,8 +150,8 @@ class Neo4jConnector:
         return None
 
     def add_property_node(self, product_node: dict, property_name: str, property_value, property_label: str, relationship_properties: dict = None):
-        print("services neo4j add_property_node")
-        logger.info(f"Property type {type(property_value)}")
+        print("services neo4j add_property_node property type:", type(property_value))
+        #logger.info(f"Property type {type(property_value)}")
         property_label = f"`{property_label}`" if ' ' in property_label and "`" not in property_label else property_label
         if isinstance(property_value, dict):
             logger.warning(f"Adding unit property node: {property_value}")
@@ -190,7 +190,7 @@ class Neo4jConnector:
                     relationship_query += ", ".join(
                         [f"{key}: ${key}" for key in relationship_properties.keys()])
                 relationship_query += "}]->(b) RETURN r"
-                logger.info(relationship_query)
+                #logger.info(relationship_query)
 
                 parameters = {
                     "property_node_id": property_node["element_id"],
@@ -202,8 +202,8 @@ class Neo4jConnector:
                 logger.info(parameters)
 
                 relationship_result = session.execute_write(self._execute_query, relationship_query, parameters)
-                logger.info("relationship_result")
-                logger.info(relationship_result)
+                #logger.info("relationship_result")
+                #logger.info(relationship_result)
                 if relationship_result is not None:
                     return self._serialize_relationship(relationship_result["r"])
         except Exception as e:
@@ -244,7 +244,7 @@ class Neo4jConnector:
         print("services neo4j add_unit_property_nodes")
         try:
             unit_variants = self.units_converter.convert_to_variants(property_value, property_unit)
-            print(unit_variants)
+            #print(unit_variants)
             logger.info(f"Unit variants: {unit_variants}")
             with (self.get_neo4j_session() as session):
                 property_nodes_ids = []
@@ -264,7 +264,7 @@ class Neo4jConnector:
                         Neo4jConnector._cache[cache_key] = result
                         logger.debug("Using cached result")
                     else:
-                        logger.info(query)
+                        #logger.info(query)
                         result = session.execute_read(self._execute_query, query, property_data)
                         Neo4jConnector._cache[cache_key] = result
                         logger.debug("Query executed and cached")
@@ -290,8 +290,8 @@ class Neo4jConnector:
                             result = session.execute_write(self._execute_query, query, property_data)
                             Neo4jConnector._cache[cache_key] = result
                             logger.info(result)
-                    else:
-                        logger.info(f"Nodes exist")
+                    # else:
+                    #     logger.info(f"Nodes exist")
 
                     property_node = self._serialize_node(result["n"])
                     logger.info(property_node)
@@ -302,7 +302,7 @@ class Neo4jConnector:
                         relationship_query += ", ".join(
                             [f"{key}: ${key}" for key in relationship_properties.keys()])
                     relationship_query += "}]->(b) RETURN r"
-                    logger.info(relationship_query)
+                    #logger.info(relationship_query)
 
                     parameters = {
                         "property_node_id": property_node["element_id"],
@@ -315,8 +315,8 @@ class Neo4jConnector:
                     logger.info(parameters)
 
                     relationship_result = session.execute_write(self._execute_query, relationship_query, parameters)
-                    logger.info("relationship_result")
-                    logger.info(relationship_result)
+                    #logger.info("relationship_result")
+                    #logger.info(relationship_result)
 
                 for i in range(len(property_nodes_ids)):
                     for j in range(i+1, len(property_nodes_ids)):
@@ -324,7 +324,7 @@ class Neo4jConnector:
                                 "MATCH (b) WHERE elementId(b) = $property_node_id2 " + \
                                 "MERGE (a)-[r:IS_EQUAL]-(b) " + \
                                 "RETURN r"
-                        logger.info(query)
+                        #logger.info(query)
                         parameters = {
                             "property_node_id1": property_nodes_ids[i],
                             "property_node_id2": property_nodes_ids[j]
