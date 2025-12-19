@@ -40,7 +40,7 @@ def clean_json(text: str):
 def llm(prompt, model="gpt-4.1"):
     #return llm_gemini(prompt)
     print("services cypher_search llm")
-    model = "gpt-4.1-mini"
+    #model = "gpt-4.1-mini"
     #model = "gpt-4.1-nano"
     # print("-------------")
     # print(model)
@@ -349,9 +349,37 @@ def merge_sections(data):
     # zwróć listę sekcji
     return list(merged.values())
 
+def flatten_attributes_with_dedup(sections):
+    flat = {}
+    for section in sections:
+        for attr in section.get("attributes", []):
+            for name, data in attr.items():
+                if name not in flat:
+                    flat[name] = {}
+                    if "values" in data:
+                        flat[name]["values"] = data["values"]
+                    if "unit" in data:
+                        flat[name]["unit"] = data["unit"]
+                else:
+                    if "values" in data:
+                        existing = flat[name].get("values", [])
+                        combined = list(set(existing + data["values"]))
+                        flat[name]["values"] = combined
+                    if "unit" in data and "unit" not in flat[name]:
+                        flat[name]["unit"] = data["unit"]
+    return flat
 
-def generate_params(question, product_specification):
+
+
+def generate_params(question, product_specification, labels):
     print("services cypher_search generate_params")
+    print(labels)
+    # with open(f"wynik_generate_params1.json", "w", encoding="utf-8") as f:
+    #     json.dump(product_specification, f, ensure_ascii=False, indent=2)
+    # with open(f"wynik_generate_params2.json", "w", encoding="utf-8") as f:
+    #     json.dump(merge_sections(product_specification), f, ensure_ascii=False, indent=2)
+    # with open(f"wynik_generate_params3.json", "w", encoding="utf-8") as f:
+    #     json.dump(flatten_attributes_with_dedup(merge_sections(product_specification)), f, ensure_ascii=False, indent=2)
 
     # Zapytanie do LLM z elastycznym podejściem
     prompt = f'''
@@ -366,7 +394,7 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
      * liczby z przecinkiem zamień na kropkę.
    - W polu "condition" ustaw znak warunku zgodnie z pytaniem (=, <, >, <=, >=, <>). 
    - Jeśli mamy dane zakresowe, np. większy od A ale mniejszy od B, rozbij to na dwa warunki
-   - Nie wypełniaj pól niezwiązanych bezpośrednio z produktem (np. marka, model, producent).
+   - Nie wypełniaj pól niezwiązanych bezpośrednio z produktem (np. marka, model).
    - Jeśli użytkownik pyta o parametr, który w specyfikacji jest rozbity na kilka osobnych atrybutów powiązanych, dodaj wszystkie te powiązane atrybuty do requiredProperties
 
 2. Pomijaj parametry wynikające z nazwy kategorii
@@ -380,21 +408,23 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
    - Słownik z kluczami min, max, equal w zależności od tego, jakie wartości podano.
    - Pole "currency" ustaw na podaną walutę lub PLN.
 
-4. Jednostki możliwe: m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
+4. Wypełnij pole "producers" (jeśli użytkownik podał lub zasugerował producenta):
 
-5. Wartości atrybutów w specyfikacji:
+5. Jednostki możliwe: m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
+
+6. Wartości atrybutów w specyfikacji:
    - Jeśli atrybut ma klucz "unit" → podaj wartość liczbową i jednostkę
    - Jeśli atrybut ma klucz "values" → wybierz wszystkie pasujące wartości z listy (nie poprawiaj wielkości liter, błędów, odmiany ani stylu - tekst ma zostać skopiowany 1:1, nawet jeśli wygląda niepoprawnie)
    - Jeśli atrybut ma klucz "values", a nazwa atrybutu lub wartości wskazują na dane zakresowe → pomiń go
 
-6. Znajdź **wszystkie możliwe powiązania OR** między **znalezionymi** atrybutami:
+7. Znajdź **wszystkie możliwe powiązania OR** między **znalezionymi** atrybutami:
    - Podobieństwo nazw atrybutów (np. „Specyficzne potrzeby zwierzęcia” ↔ „Dodatkowe cechy”)
    - Podobieństwo wartości (np. wspólne słowa kluczowe: „nadwaga”, „utrzymanie wagi”)
    - Dla każdego atrybutu wstaw pole `"or_with"`: lista nazw powiązanych atrybutów które są w requiredProperties. Jeśli brak powiązań → pusty array.
    - Powiązania OR twórz WYŁĄCZNIE pomiędzy atrybutami, które znalazły się w requiredProperties. 
    - Nigdy nie analizuj ani nie wykorzystuj atrybutów, które nie zostały wybrane.
 
-7. Jeśli ten sam atrybut w specyfikacji występuje kilka razy w różnych jednostkach (np. kg i g) ale pod tą samą nazwą:
+8. Jeśli ten sam atrybut w specyfikacji występuje kilka razy w różnych jednostkach (np. kg i g) ale pod tą samą nazwą:
    ZASADA JEDNEGO PARAMETRU (OBOWIĄZKOWA — NIE WOLNO NARUSZYĆ):
    - Traktuj je jako JEDEN parametr i wybierz tylko jeden wariant.
      * Jeśli użytkownik poda jednostkę → wybierz wariant w tej jednostce.
@@ -403,14 +433,20 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
    - Nigdy nie twórz OR pomiędzy wariantami tego samego parametru (różne jednostki lub formaty nazwy).
      OR może łączyć wyłącznie różne parametry, nigdy alternatywne wersje jednego parametru.
 
-8. W polu advice1 wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych
-9. W polu advice2 wpisz informację, co możemy poprawić aby Twoja odpowiedź była szybsza (teraz odpowiadasz w zakresie 8-15 sekund, a powinieneś w max 5 sekund)
+9. W polu advice1 wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych
+10. W polu advice2 wpisz informację, co możemy poprawić aby Twoja odpowiedź była szybsza (teraz odpowiadasz w zakresie 8-15 sekund, a powinieneś w max 5 sekund)
 
 Pytanie użytkownika:
 {question}
 
-Specyfikacja produktu:
-{merge_sections(product_specification)}
+Kategorie produktów:
+{labels}
+
+Specyfikacja produktów:
+{flatten_attributes_with_dedup(merge_sections(product_specification))}
+
+Dostępni producenci
+{get_producers_by_label(labels)}
 
 Odpowiedz w poprawnym formacie JSON:
 {{
@@ -436,6 +472,7 @@ Odpowiedz w poprawnym formacie JSON:
     "equal": 500,
     "currency": "PLN"
   }},
+  "producers": ["Mercedes", "Ford"],
   "advice1": "Twoja sugestia na poprawienie zapytania - tematy jakościowe",
   "advice2": "Twoja sugestia na poprawienie zapytania - tematy szybkości odpowiedzi",
 }}
@@ -448,9 +485,11 @@ Odpowiedz w poprawnym formacie JSON:
     #print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
     #print(prompt)
     #print('BBBBBBBBBB________________________BBBBBBBBBBBBBBBBBBBBBBB')
-    response_text = llm(prompt)
+    response_text = llm(prompt, 'gpt-4.1-mini')
+    print('----------------response--------------')
+    print(response_text)
     params = json.loads(response_text)
-    #print('----------------response--------------')
+    print('----------------response--------------')
     #print(params)
     # params["productTypes"] = labels
     return params
@@ -586,6 +625,29 @@ Odpowiedz w formacie json:
     #print(params)
     # params["productTypes"] = labels
     return params
+
+
+def get_producers_by_label(labels):
+    print("get_producers_by_label")
+    cypher_query = """
+        MATCH (p:Product)
+        WHERE p.producer IS NOT NULL
+            AND ANY(label IN $labels WHERE label IN labels(p))
+        RETURN DISTINCT p.producer AS producer
+        ORDER BY p.producer;
+    """
+    with driver.session() as session:
+        # parametr przekazujemy jako słownik
+        result = session.run(cypher_query, {"labels": labels})
+        records = list(result)
+        if not records:
+            print("Brak wyników")
+            return []
+
+        # Wyciągamy pole 'producer' z wyników
+        producers = [record["producer"] for record in records]
+        print(producers)
+        return producers
 
 
 def exec_query_ORYG(params, return_parameters=False):
@@ -727,6 +789,12 @@ def exec_query(params, return_parameters=False):
     cypher_query = """
 MATCH (product:Product)
 WHERE any(label in $productTypes WHERE label IN labels(product))
+"""
+    if params['producers']:
+        cypher_query += """
+    AND product.producer IN $producers
+    """
+    cypher_query += """
 OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
 """
     cypher_query += price_query
@@ -877,9 +945,35 @@ Pytanie użytkownika:
 def filter_types(user_query, types_response):
     print("services cypher_search filter_types")
     prompt = f'''
-Określ, których z podanych typów produktów może dotyczyć pytanie użytkownika.
-W odpowiedzi podaj listę type_code.
-Musisz wybrać co najmniej jeden type_code.
+
+Twoim zadaniem jest określenie, które z podanych typów produktów
+są powiązane z pytaniem użytkownika.
+
+WAŻNE ZASADY (obowiązkowe):
+1. NIE oceniaj, który typ jest bardziej ogólny lub bardziej szczegółowy.
+2. NIE wybieraj minimalnego zestawu typów.
+3. Traktuj każdy typ produktu niezależnie.
+4. Sprawdź KAŻDY typ osobno i zdecyduj, czy pasuje do pytania użytkownika.
+
+Zasady dopasowania:
+5. Jeśli nazwa typu produktu zawiera JAKIKOLWIEK atrybut, standard, wariant, generację lub cechę występującą w pytaniu użytkownika,
+   DODAJ ten typ do odpowiedzi.
+6. Jeśli pytanie zawiera atrybut, a w typach istnieją równoważne nazwy lub synonimy tego atrybutu, 
+   uwzględnij WSZYSTKIE typy, których nazwa zawiera ten atrybut lub jego synonim (na różnym poziomie szczegółowości)
+7. NIE pomijaj typów z powodu ich „ogólności”, „nadmiarowości” ani dlatego, że inny typ wydaje się bardziej precyzyjny.
+
+Dodatkowe wyjaśnienie:
+– Różne typy mogą opisywać TEN SAM produkt z różnych perspektyw
+  (np. standard, forma, kategoria).
+– Jeśli kilka typów pasuje, ZWRÓĆ JE WSZYSTKIE.
+
+Wynik:
+8. W odpowiedzi podaj WYŁĄCZNIE listę `type_code`.
+9. Musisz zwrócić co najmniej jeden `type_code`.
+10. Nie dodawaj komentarzy ani wyjaśnień.
+
+W polu advice umieść informację, czy prompt był jasno sformułowany, oraz uzasadnienie dlaczego wybrałeś te typy.
+
 Typy:
 {types_response}
 
@@ -887,11 +981,12 @@ Pytanie użytkownika:
 {user_query}
 
 Odpowiedz w formacie json:
-{{"types": ["type_code1", "type_code2"]}}
+{{"types": ["type_code1", "type_code2"], "advice":"Twoja odpowiedź"}}
     '''
     print(prompt)
     response_text = llm(prompt)
     data = json.loads(response_text)
+    print(data)
     return data
 
 def check_ean(text):
@@ -1364,7 +1459,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
 
     try:
         start = time.time()
-        params = generate_params(user_query, specifications)
+        params = generate_params(user_query, specifications, types)
         params = filter_none_params(params)
         end = time.time()
         logger.info(f"Generowanie parametrów cypher2 (AI): {end - start} s")
