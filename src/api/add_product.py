@@ -33,8 +33,8 @@ class AddProduct(HTTPMethodView):
                 existing_version = existing_product.get('ProductVersion')
                 new_version = pim_data.get('ProductVersion')
                 if parse_version(new_version) == parse_version(existing_version):
-                    #request.app.ctx.NEO4J.delete_product_and_relations(existing_product['action'])
-                    #print("Force aktualizacja produktu ", existing_product['action'], existing_version, new_version)
+                    # request.app.ctx.NEO4J.delete_product_and_relations(existing_product['action'])
+                    # print("Force aktualizacja produktu ", existing_product['action'], existing_version, new_version)
                     print("Produkt o takim action i wersji już istnieje",existing_product['action'], existing_version)
                     return JSONResponse(
                         body={"error": "Produkt o takim action i wersji już istnieje"},
