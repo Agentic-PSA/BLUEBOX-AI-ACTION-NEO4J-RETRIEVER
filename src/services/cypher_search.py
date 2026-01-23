@@ -393,9 +393,10 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
      * jeśli jedną wartość → pojedyncza wartość,
      * liczby z przecinkiem zamień na kropkę.
    - W polu "condition" ustaw znak warunku zgodnie z pytaniem (=, <, >, <=, >=, <>). 
-   - Jeśli mamy dane zakresowe, np. większy od A ale mniejszy od B, rozbij to na dwa warunki
+   - Jeśli mamy dane zakresowe, np. większy od A ale mniejszy od B, koniecznie rozbij to na dwa warunki
    - Nie wypełniaj pól niezwiązanych bezpośrednio z produktem (np. marka, model).
    - Jeśli użytkownik pyta o parametr, który w specyfikacji jest rozbity na kilka osobnych atrybutów powiązanych, dodaj wszystkie te powiązane atrybuty do requiredProperties
+   - Nie dodaj producenta do "requiredProperties". Od tego jest inne pole, opisane poniżej.
 
 2. Pomijaj parametry wynikające z nazwy kategorii
    - Nie dodawaj do requiredProperties parametrów, których wartość jest już zawarta w nazwie kategorii produktu.
@@ -485,7 +486,8 @@ Odpowiedz w poprawnym formacie JSON:
     #print('AAAAAAA___________________AAAAAAAAAAAAAAAA')
     #print(prompt)
     #print('BBBBBBBBBB________________________BBBBBBBBBBBBBBBBBBBBBBB')
-    response_text = llm(prompt, 'gpt-4.1-mini')
+    #response_text = llm(prompt, 'gpt-4.1-mini')
+    response_text = llm(prompt)
     print('----------------response--------------')
     print(response_text)
     params = json.loads(response_text)
@@ -802,7 +804,7 @@ OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
 WITH product, collect({
   name: prop.name,
   value: prop.value,
-  unit: prop.unit
+  unit: replace(prop.unit, ' ', '')
 }) AS properties
 
 WHERE size([
@@ -824,7 +826,7 @@ WHERE size([
               ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'INTEGER' AND apoc.meta.cypher.type(prop.value) = 'STRING' AND prop.value STARTS WITH toString(reqProp.value)) OR
               ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
             ) AND
-            (reqProp.unit IS NULL OR prop.unit = reqProp.unit)
+            (reqProp.unit IS NULL OR replace(prop.unit, ' ', '') = replace(reqProp.unit, ' ', ''))
         ]) > 0
     ]) > 0
 ]) = size($orGroups)
@@ -902,7 +904,7 @@ lub
 lub jeżeli użytkownik podał kilka produktów:
 {{"products": [{{"name": "Nazwa produktu X"}}, {{"EAN": "EAN produktu Y"}}, {{"PN": "Part number produktu Z"}}, ...] }}
 lub jeżeli dotyczy kompatybilności:
-{{"types": ["komputery", "laptopy"], "compatible_with": {{"name": "Nazwa produktu", "EAN": "EAN produktu", "PN": "Part number produktu", "action": "Kod action"}} "params":true/false }}
+{{"types": ["komputery", "laptopy"], "compatible_with": {{"name": "Nazwa produktu", "EAN": "EAN produktu", "PN": "Part number produktu", "action": "Kod action", "reason": "Dlaczego uznałeś to za pytanie o kompatybilność"}} "params":true/false }}
 
 
 Przykłady:
@@ -963,13 +965,12 @@ Zasady dopasowania:
 7. NIE pomijaj typów z powodu ich „ogólności”, „nadmiarowości” ani dlatego, że inny typ wydaje się bardziej precyzyjny.
 
 Dodatkowe wyjaśnienie:
-– Różne typy mogą opisywać TEN SAM produkt z różnych perspektyw
-  (np. standard, forma, kategoria).
+– Różne typy mogą opisywać TEN SAM produkt z różnych perspektyw (np. standard, forma, kategoria).
 – Jeśli kilka typów pasuje, ZWRÓĆ JE WSZYSTKIE.
 
 Wynik:
 8. W odpowiedzi podaj WYŁĄCZNIE listę `type_code`.
-9. Musisz zwrócić co najmniej jeden `type_code`.
+9. Musisz zwrócić co najmniej jeden `type_code`. Nie zwracaj więcej niż dwa `type_code`.
 10. Nie dodawaj komentarzy ani wyjaśnień.
 
 W polu advice umieść informację, czy prompt był jasno sformułowany, oraz uzasadnienie dlaczego wybrałeś te typy.
@@ -1142,7 +1143,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
         }
 
     types_query = user_query
-    if "compatible_with" in data:
+    if "compatible_with-DELETE" in data:
         try:
             params_search = data.get("params", False)
             if isinstance(params_search, str):
@@ -1220,7 +1221,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             except Exception as e:
                 return {
                     "success": False,
-                    "message": f"Błąd podczas generowania parametrów Cypher: {str(e)}",
+                    "message": f"Błąd podczas generowania parametrów Cypher 1: {str(e)}",
                     "times": times,
                     "types": types_response,
                     "time": sum(times.values())
@@ -1271,6 +1272,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             "params": params,
             "time": sum(times.values())
         }
+
     if "types" in data:
         types = data["types"]
         if not types:
@@ -1436,6 +1438,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
 
             # print(f"Pobieranie specyfikacji dla typu: {t}")
             arr = src.services.product_specification.get_product_specification(t)
+            # with open(f"wynik_arr.json", "w", encoding="utf-8") as f:
+            #     json.dump(arr, f, ensure_ascii=False, indent=2)
+
             specification = arr[0]
             mapping = arr[1]
             categories = arr[2]
@@ -1459,7 +1464,9 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
 
     try:
         start = time.time()
+        print("generate params")
         params = generate_params(user_query, specifications, types)
+        print("filter nine params")
         params = filter_none_params(params)
         end = time.time()
         logger.info(f"Generowanie parametrów cypher2 (AI): {end - start} s")
@@ -1467,7 +1474,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     except Exception as e:
         return {
             "success": False,
-            "message": f"Błąd podczas generowania parametrów Cypher: {str(e)}",
+            "message": f"Błąd podczas generowania parametrów Cypher 2: {str(e)}",
             "times": times,
             "types": types_response,
             "time": sum(times.values())
