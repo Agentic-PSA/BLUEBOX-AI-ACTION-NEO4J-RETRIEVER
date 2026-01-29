@@ -480,6 +480,9 @@ Odpowiedz w poprawnym formacie JSON:
     '''
 
     print('PROMPT LEN: ', len(prompt), len(product_specification))
+    # with open(f"wynik_prompt.json", "w", encoding="utf-8") as f:
+    #     json.dump({'labels':labels, 'product_specification':product_specification}, f, ensure_ascii=False, indent=2)
+
     #print(json.dumps(product_specification, indent=4, ensure_ascii=False))
     # print(product_specification)
     #response_content = response_text.replace('```', '').replace('json', '')
@@ -628,6 +631,17 @@ Odpowiedz w formacie json:
     # params["productTypes"] = labels
     return params
 
+
+def check_quantity(category_type):
+    print("check_quantity")
+    cypher_query = """
+        MATCH (p:Product)
+        WHERE $label IN labels(p)
+        RETURN count(p) AS cnt;
+    """
+    with driver.session() as session:
+        record = session.run(cypher_query, label=category_type).single()
+        return record["cnt"] if record else 0
 
 def get_producers_by_label(labels):
     print("get_producers_by_label")
@@ -854,31 +868,6 @@ RETURN product
         return results
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def get_embedding(text, model="text-embedding-3-small"):
     print("services cypher_search get_embedding")
     response = client_gpt.embeddings.create(
@@ -970,7 +959,7 @@ Dodatkowe wyjaśnienie:
 
 Wynik:
 8. W odpowiedzi podaj WYŁĄCZNIE listę `type_code`.
-9. Musisz zwrócić co najmniej jeden `type_code`. Nie zwracaj więcej niż dwa `type_code`.
+9. Musisz zwrócić co najmniej jeden `type_code`. Nie zwracaj więcej niż cztery `type_code`.
 10. Nie dodawaj komentarzy ani wyjaśnień.
 
 W polu advice umieść informację, czy prompt był jasno sformułowany, oraz uzasadnienie dlaczego wybrałeś te typy.
@@ -1602,6 +1591,7 @@ def extend_required_properties(mapping, params):
 
 
 def type_to_label(t: str):
+    return t
     print("services cypher_search type_to_label")
     return t.replace("-", "_")
 

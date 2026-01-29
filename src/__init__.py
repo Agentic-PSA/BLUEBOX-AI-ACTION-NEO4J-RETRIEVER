@@ -8,7 +8,7 @@ from sanic_cors import CORS
 from .services import Neo4jConnector
 from .utils import UnitConverter
 
-from .api import AddNode, AddType, AddProduct, Cypher, Compatibility, PropertiesValues, AddValues, Units, AddPrices
+from .api import AddNode, AddType, AddProduct, Cypher, Compatibility, PropertiesValues, AddValues, Units, AddPrices, CheckQuantity
 from .api import GetProduct, GetProducts, Search, SimpleSearch
 from sanic import Sanic, response
 
@@ -38,6 +38,7 @@ def get_app(root_path: str) -> Sanic:
     app.add_route(PropertiesValues.as_view(), 'properties_values/')
     app.add_route(AddValues.as_view(), 'add_values/')
     app.add_route(Units.as_view(), 'units/')
+    app.add_route(CheckQuantity.as_view(), 'check_quantity/')
 
     @app.route("/demo_search", methods=["GET"])
     async def serve_index(request):

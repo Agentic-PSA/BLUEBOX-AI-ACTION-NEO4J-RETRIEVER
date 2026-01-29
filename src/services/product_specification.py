@@ -1,20 +1,6 @@
 import psycopg2
 from psycopg2 import extras, sql
-
-from src.services.spiff_connector import SpiffConnector
 import os
-
-user = "spiffworkflow_backend"
-password = "spiffworkflow_backend"
-host = "172.19.3.220"
-port = "30432"
-database = "spiffworkflow_backend"
-connector = SpiffConnector(user=os.environ.get("SPIFF_DB_USER"),
-                           password=os.environ.get("SPIFF_DB_PASSWORD"),
-                           host=os.environ.get("SPIFF_DB_HOST"),
-                           port=os.environ.get("SPIFF_DB_PORT"),
-                           database=os.environ.get("SPIFF_DB_DATABASE"))
-
 
 def get_form_data_many(column: str, labels: list, table: str= 'forms') -> dict:
     """
@@ -120,7 +106,7 @@ def filter_language(specification, language="PL", mapping={}, categories={}, exc
     category = category_in
     if "/" in category:
         category = category.split("/", 1)[1].strip()
-    print('filter_language', category)
+    print('----->filter_language', 'type=',category_type, 'in=',category_in, 'cat=',category)
 
     filtered_sections = []
     for section in specification:
@@ -152,7 +138,7 @@ def filter_language(specification, language="PL", mapping={}, categories={}, exc
             mapping_attr = mapping_section.get(attribute, {})
             unit = mapping_attr.get("unit", "")
 
-            if unit:
+            if unit and unit != 'dimensionless':
                 struct = {attribute: {"unit": unit}}
             else:
                 values = attribute_dict.get("values", [])
