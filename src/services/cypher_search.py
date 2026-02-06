@@ -436,6 +436,7 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
 
 9. W polu advice1 wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych
 10. W polu advice2 wpisz informację, co możemy poprawić aby Twoja odpowiedź była szybsza (teraz odpowiadasz w zakresie 8-15 sekund, a powinieneś w max 5 sekund)
+11. Jeśli w zapytaniu masz informację w nawiasach kwadratowych [] - to jest to podpowiedź co do wyboru parametru
 
 Pytanie użytkownika:
 {question}
@@ -804,7 +805,8 @@ def exec_query(params, return_parameters=False):
 
     cypher_query = """
 MATCH (product:Product)
-WHERE any(label in $productTypes WHERE label IN labels(product))
+WHERE any(l IN labels(product) WHERE replace(l, "-", "_") IN [pt IN $productTypes | replace(pt, "-", "_")])
+
 """
     if params['producers']:
         cypher_query += """

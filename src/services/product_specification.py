@@ -126,13 +126,13 @@ def filter_language(specification, language="PL", mapping={}, categories={}, exc
                             #print("USUWAM 1",section_name,attribute)
                             continue
             #usun nieistotne parametry
-            if section_name in excludes:
-                if attribute in excludes[section_name]:
-                    exclude_value = excludes[section_name][attribute]
-                    if exclude_value:
-                        if category_type != category_in:
-                            #print("USUWAM 2",section_name,attribute)
-                            continue
+            # if section_name in excludes:
+            #     if attribute in excludes[section_name]:
+            #         exclude_value = excludes[section_name][attribute]
+            #         if exclude_value:
+            #             if category_type != category_in:
+            #                 #print("USUWAM 2",section_name,attribute)
+            #                 continue
 
             mapping_section = mapping.get(section_name, {})
             mapping_attr = mapping_section.get(attribute, {})
