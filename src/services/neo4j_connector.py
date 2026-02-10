@@ -1034,10 +1034,27 @@ RETURN product
             results = session.execute_read(self._execute_query_records, query, properties)
             
             for record in results:
-                formatted_results.append({"type_code": record["type_code"], "type_name": record["type_name"], "similarity": record["similarity"]})
-            logger.debug(results)
-            logger.debug(formatted_results)
-        return results
+                formatted_results.append({"type_code": record["type_code"], "similarity": record["similarity"]})
+            print("------------------")
+            print(results)
+            print("------------------")
+            print(formatted_results)
+            print("------------------")
+
+            # Jeśli mniej niż 3 wyniki, po prostu zwracamy wszystko
+            if len(formatted_results) < 3:
+                return formatted_results
+
+            # Sprawdzenie similarity 3-go wyniku
+            third_similarity = formatted_results[2]["similarity"]
+
+            if third_similarity < 0.5:
+                # Jeśli 3-ci wynik < 0.5, zwracamy wszystkie z similarity > 0
+                return [r for r in formatted_results if r["similarity"] > 0]
+            else:
+                # Jeśli 3-ci wynik >= 0.5, zwracamy tylko pierwsze 20
+                return formatted_results[:20]  
+        return formatted_results
     
 
     def execute_query(self, query, properties={}):

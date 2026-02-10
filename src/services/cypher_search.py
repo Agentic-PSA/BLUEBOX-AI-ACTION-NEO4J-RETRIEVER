@@ -307,6 +307,7 @@ WYMAGANIA TECHNICZNE:
 
 
 def merge_sections(data):
+    print("merge_sections")
     merged = {}
 
     for category, sections in data.items():
@@ -340,7 +341,7 @@ def merge_sections(data):
                 for key, val in attr_value.items():
                     if key == "values":
                         # scalanie wartości + usunięcie duplikatów + normalizacja spacji
-                        combined = set(v.strip() for v in existing_value.get("values", []) + val)
+                        combined = set(v.strip() for v in existing_value.get("values", []) + (val or []) if v is not None)
                         existing_value["values"] = list(combined)
                     else:
                         # inne pola nadpisujemy lub dodajemy
@@ -350,6 +351,7 @@ def merge_sections(data):
     return list(merged.values())
 
 def flatten_attributes_with_dedup(sections):
+    print("flatten_attributes_with_dedup")
     flat = {}
     for section in sections:
         for attr in section.get("attributes", []):
