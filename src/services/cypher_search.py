@@ -483,8 +483,8 @@ Odpowiedz w poprawnym formacie JSON:
     '''
 
     print('PROMPT LEN: ', len(prompt), len(product_specification))
-    # with open(f"wynik_prompt.json", "w", encoding="utf-8") as f:
-    #     json.dump({'labels':labels, 'product_specification':product_specification}, f, ensure_ascii=False, indent=2)
+    with open(f"wynik_prompt.json", "w", encoding="utf-8") as f:
+        json.dump({'labels':labels, 'product_specification':flatten_attributes_with_dedup(merge_sections(product_specification))}, f, ensure_ascii=False, indent=2)
 
     #print(json.dumps(product_specification, indent=4, ensure_ascii=False))
     # print(product_specification)
@@ -668,86 +668,6 @@ def get_producers_by_label(labels):
         print(producers)
         return producers
 
-
-def exec_query_ORYG(params, return_parameters=False):
-    print("services cypher_search exec_query")
-    price_query = ""
-    price = params.get("price")
-
-    if price:
-        currency = params.get("currency", "PLN")
-        if price.get("equal"):
-            price_query = f'MATCH (product)-[:HAS]->(price:Price {{value: {price.get("equal")}, currency: "{currency}"}})'
-        elif price.get("min") and price.get("max"):
-            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.value <= {price.get("max")} AND price.currency = "{currency}"'
-        elif price.get("min"):
-            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.currency = "{currency}"'
-        elif price.get("max"):
-            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value <= {price.get("max")} AND price.currency = "{currency}"'
-
-    cypher_query = """
-MATCH (product:Product)
-WHERE any(label in $productTypes WHERE label IN labels(product))
-OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL) """
-    cypher_query += price_query
-    cypher_query += """ WITH product, collect({
-  name: prop.name,
-  value: prop.value,
-  unit: prop.unit
-}) as properties
-WHERE size([reqProp IN $requiredProperties WHERE
-  size([prop IN properties WHERE
-    toLower(prop.name) = toLower(reqProp.name)
- AND
-    (
-      (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toLower(toString(prop.value)) IN reqProp.value) OR
-      (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
-      (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
-      (reqProp.condition = '<' AND prop.value < reqProp.value) OR
-      (reqProp.condition = '>' AND prop.value > reqProp.value) OR
-      (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
-      (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
-      ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
-      ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'INTEGER' AND apoc.meta.cypher.type(prop.value) = 'STRING' AND prop.value STARTS WITH toString(reqProp.value)) OR
-      ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
-    ) AND
-    (reqProp.unit IS NULL OR prop.unit = reqProp.unit)
-  ]) > 0
-]) = size($requiredProperties)
-RETURN product
-"""
-    if return_parameters:
-        cypher_query += ", properties"
-
-    print(cypher_query)
-    print(params)
-
-    with driver.session() as session:
-        result = session.run(cypher_query, params)
-        records = list(result)
-        if not len(records):
-            print("Brak wyników")
-        results = [record.data().get("product", {}) for record in records]
-        for record in results:
-            if record.get("nameEmbedding"):
-                del record["nameEmbedding"]
-            if record.get("productNumberEmbedding"):
-                del record["productNumberEmbedding"]
-        return results
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def build_or_groups(required_props):
     """
     Tworzy listę grup:
@@ -847,7 +767,11 @@ WHERE size([
             (reqProp.unit IS NULL OR replace(prop.unit, ' ', '') = replace(reqProp.unit, ' ', ''))
         ]) > 0
     ]) > 0
-]) = size($orGroups)
+]) >= CASE 
+        WHEN size($orGroups) >= 3
+        THEN size($orGroups) - 1
+        ELSE size($orGroups)
+     END
 RETURN product
 """
     if return_parameters:

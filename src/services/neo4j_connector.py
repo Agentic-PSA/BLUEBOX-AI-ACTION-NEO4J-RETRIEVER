@@ -1021,7 +1021,7 @@ RETURN product
         WITH t, gds.similarity.cosine(queryVector, t.nameEmbedding) AS similarity
         RETURN t.code AS type_code, t.name AS type_name, similarity
         ORDER BY similarity DESC
-        LIMIT 100
+        LIMIT 20
         """
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
@@ -1034,7 +1034,7 @@ RETURN product
             results = session.execute_read(self._execute_query_records, query, properties)
             
             for record in results:
-                formatted_results.append({"type_code": record["type_code"], "similarity": record["similarity"]})
+                formatted_results.append({"type_code": record["type_code"], "type_name": record["type_name"], "similarity": record["similarity"]})
             print("------------------")
             print(results)
             print("------------------")
