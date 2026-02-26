@@ -10,9 +10,9 @@ class Prices:
         self.exchange_rates = {}
         self.prices_headers = {
             "accept": "application/json",
-            "CustomerId": "54536",
+            "CustomerId": os.environ.get("ACTION_API_CUSTOMER_ID"),
             "UserName": "neo",
-            "ActionApiKey": "8UgpksqzzkdbL/YThj7i149H/an2iK+oITuw68/7S10="
+            "ActionApiKey": os.environ.get("ACTION_API_KEY")
              }
 
     def get_all_prices(self, currency: str = "PLN") -> list:
