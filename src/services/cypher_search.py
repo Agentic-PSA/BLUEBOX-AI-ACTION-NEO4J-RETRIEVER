@@ -16,15 +16,10 @@ from copy import deepcopy
 import src.services.product_specification
 import src.services.db_schema
 
-# client = Anthropic(
-#     api_key="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",
-#     # This is the default and can be omitted
-# )
 uri = f"neo4j://{os.environ.get('NEO4J_HOST')}:{os.environ.get('NEO4J_PORT')}"
 driver = GraphDatabase.driver(uri, auth=(os.environ.get("NEO4J_USER"), os.environ.get("NEO4J_PASSWORD")))
 
-client_gpt = openai.OpenAI(
-   api_key="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")
+client_gpt = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 def clean_json(text: str):
     if text is None:
@@ -38,7 +33,7 @@ def clean_json(text: str):
     return text
 
 def llm(prompt, model="gpt-4.1"):
-    #return llm_gemini(prompt)
+    return llm_gemini(prompt)
     print("services cypher_search llm")
     #model = "gpt-4.1-mini"
     #model = "gpt-4.1-nano"
@@ -74,6 +69,7 @@ def llm_gemini(prompt):
     # print('------------------')
     # exit()
     model = genai.GenerativeModel("models/gemini-2.5-pro")
+    #model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(
         prompt,
         safety_settings=None,  # opcjonalnie usunięcie filtrów bezpieczeństwa
@@ -438,7 +434,8 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
 
 9. W polu advice1 wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych
 10. W polu advice2 wpisz informację, co możemy poprawić aby Twoja odpowiedź była szybsza (teraz odpowiadasz w zakresie 8-15 sekund, a powinieneś w max 5 sekund)
-11. Jeśli w zapytaniu masz informację w nawiasach kwadratowych [] - to jest to podpowiedź co do wyboru parametru
+11. W polu advice3 wpisz informację, jaki obecnie model LLM jest używany, a który byłby lepszy do tego zadania. Podaj nazwy modeli i ich wersje, np. gemini 1.5.flash
+12. Jeśli w zapytaniu masz informację w nawiasach kwadratowych [] - to jest to podpowiedź co do wyboru parametru
 
 Pytanie użytkownika:
 {question}
@@ -706,7 +703,7 @@ def build_or_groups(required_props):
     return groups
 
 
-def exec_query(params, return_parameters=False):
+def exec_query_PROD(params, return_parameters=False):
     print("services cypher_search exec_query")
     price_query = ""
     price = params.get("price")
@@ -794,6 +791,359 @@ RETURN product
             if record.get("productNumberEmbedding"):
                 del record["productNumberEmbedding"]
         return results
+
+
+
+
+
+def exec_query_CNT(params, return_parameters=False):
+    print("services cypher_search exec_query")
+    price_query = ""
+    price = params.get("price")
+
+    if price:
+        currency = params.get("currency", "PLN")
+        if price.get("equal"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price {{value: {price.get("equal")}, currency: "{currency}"}})'
+        elif price.get("min") and price.get("max"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.value <= {price.get("max")} AND price.currency = "{currency}"'
+        elif price.get("min"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.currency = "{currency}"'
+        elif price.get("max"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value <= {price.get("max")} AND price.currency = "{currency}"'
+
+    required_props = params.get("requiredProperties", [])
+    or_groups = build_or_groups(required_props)  # automatycznie generuje OR-grupy
+
+    cypher_query = """
+MATCH (product:Product)
+WHERE any(l IN labels(product) WHERE replace(l, "-", "_") IN [pt IN $productTypes | replace(pt, "-", "_")])
+
+"""
+    if params['producers']:
+        cypher_query += """
+    AND product.producer IN $producers
+    """
+    cypher_query += """
+OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
+"""
+    cypher_query += price_query
+    cypher_query += """
+
+
+WITH product, collect({
+  name: prop.name,
+  value: prop.value,
+  unit: replace(prop.unit, ' ', '')
+}) AS properties
+
+WITH product, properties,
+size([
+  group IN $orGroups WHERE
+    size([
+      reqProp IN $requiredProperties WHERE
+        reqProp.name IN group AND size([
+          prop IN properties WHERE
+            toLower(prop.name) = toLower(reqProp.name) AND
+            (
+              (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toString(prop.value) IN reqProp.value) OR
+              (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
+              (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
+              (reqProp.condition = '<' AND prop.value < reqProp.value) OR
+              (reqProp.condition = '>' AND prop.value > reqProp.value) OR
+              (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
+              (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
+              ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
+              ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'INTEGER' AND apoc.meta.cypher.type(prop.value) = 'STRING' AND prop.value STARTS WITH toString(reqProp.value)) OR
+              ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
+            ) AND
+            (reqProp.unit IS NULL OR replace(prop.unit, ' ', '') = replace(reqProp.unit, ' ', ''))
+        ]) > 0
+    ]) > 0
+]) AS matchedGroups
+
+WHERE matchedGroups >= CASE 
+        WHEN size($orGroups) >= 2
+        THEN size($orGroups) - 1
+        ELSE size($orGroups)
+     END
+RETURN product, matchedGroups
+"""
+    if return_parameters:
+        cypher_query += ", properties"
+
+    cypher_query += "ORDER BY matchedGroups DESC"
+    # wysyłamy parametry do Neo4j
+    neo4j_params = params.copy()
+    neo4j_params["orGroups"] = or_groups
+    #print(cypher_query)
+    print(neo4j_params)
+    with driver.session() as session:
+        result = session.run(cypher_query, neo4j_params)
+        records = list(result)
+        if not len(records):
+            print("Brak wyników")
+        results = []
+        for record in records:
+            data = record.data()
+            product = data.get("product", {})
+
+            product.pop("nameEmbedding", None)
+            product.pop("productNumberEmbedding", None)
+
+            product["matchedOrGroups"] = data.get("matchedGroups", 0)
+
+            results.append(product)            
+
+        return results
+
+
+
+
+
+def exec_query(params, return_parameters=False):
+    print("services cypher_search exec_query")
+    price_query = ""
+    price = params.get("price")
+
+    if price:
+        currency = params.get("currency", "PLN")
+        if price.get("equal"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price {{value: {price.get("equal")}, currency: "{currency}"}})'
+        elif price.get("min") and price.get("max"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.value <= {price.get("max")} AND price.currency = "{currency}"'
+        elif price.get("min"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.currency = "{currency}"'
+        elif price.get("max"):
+            price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value <= {price.get("max")} AND price.currency = "{currency}"'
+
+    required_props = params.get("requiredProperties", [])
+    or_groups = build_or_groups(required_props)  # automatycznie generuje OR-grupy
+
+    cypher_query = """
+MATCH (product:Product)
+WHERE any(l IN labels(product) WHERE replace(l, "-", "_") IN [pt IN $productTypes | replace(pt, "-", "_")])
+
+"""
+    if params['producers']:
+        cypher_query += """
+    AND product.producer IN $producers
+    """
+    cypher_query += """
+OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
+"""
+    cypher_query += price_query
+    cypher_query += """
+
+
+WITH product, collect({
+  name: prop.name,
+  value: prop.value,
+  unit: replace(prop.unit, ' ', '')
+}) AS properties
+
+WITH product, properties,
+
+// indeksy spełnionych grup
+[i IN range(0, size($orGroups)-1) WHERE
+    size([
+        reqProp IN $requiredProperties WHERE
+            reqProp.name IN $orGroups[i] AND
+            size([
+                prop IN properties WHERE
+                    toLower(prop.name) = toLower(reqProp.name) AND
+                    (
+                        (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toString(prop.value) IN reqProp.value) OR
+                        (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
+                        (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
+                        (reqProp.condition = '<' AND prop.value < reqProp.value) OR
+                        (reqProp.condition = '>' AND prop.value > reqProp.value) OR
+                        (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
+                        (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
+                        ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
+                        ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
+                    ) AND
+                    (reqProp.unit IS NULL OR replace(prop.unit,' ','') = replace(reqProp.unit,' ',''))
+            ]) > 0
+    ]) > 0
+] AS matchedGroupIndexes
+
+WITH product, properties,
+matchedGroupIndexes,
+size(matchedGroupIndexes) AS matchedGroupsCount,
+[i IN matchedGroupIndexes | $orGroups[i]] AS matchedGroups,
+[i IN range(0, size($orGroups)-1) 
+   WHERE NOT i IN matchedGroupIndexes | $orGroups[i]] 
+   AS notMatchedGroups
+
+WHERE matchedGroupsCount >= CASE 
+        WHEN size($orGroups) >= 2
+        THEN size($orGroups) - 1
+        ELSE size($orGroups)
+     END
+
+RETURN product, 
+       matchedGroupsCount,
+       matchedGroups,
+       notMatchedGroups
+"""
+    if return_parameters:
+        cypher_query += ", properties"
+
+    cypher_query += "ORDER BY matchedGroupsCount DESC"
+    # wysyłamy parametry do Neo4j
+    neo4j_params = params.copy()
+    neo4j_params["orGroups"] = or_groups
+    #print(cypher_query)
+    print(neo4j_params)
+    with driver.session() as session:
+        result = session.run(cypher_query, neo4j_params)
+        records = list(result)
+        if not len(records):
+            print("Brak wyników")
+        results = []
+        for record in records:
+            data = record.data()
+            product = data.get("product", {})
+
+            product.pop("nameEmbedding", None)
+            product.pop("productNumberEmbedding", None)
+            product["matchedOrGroupsCount"] = data.get("matchedGroupsCount", 0)
+            product["matchedGroups"] = data.get("matchedGroups", [])
+            product["notMatchedGroups"] = data.get("notMatchedGroups", [])
+
+            results.append(product)            
+
+        return results
+
+
+
+
+# def exec_query(params, return_parameters=False):
+#     print("services cypher_search exec_query")
+#     price_query = ""
+#     price = params.get("price")
+
+#     if price:
+#         currency = params.get("currency", "PLN")
+#         if price.get("equal"):
+#             price_query = f'MATCH (product)-[:HAS]->(price:Price {{value: {price.get("equal")}, currency: "{currency}"}})'
+#         elif price.get("min") and price.get("max"):
+#             price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.value <= {price.get("max")} AND price.currency = "{currency}"'
+#         elif price.get("min"):
+#             price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value >= {price.get("min")} AND price.currency = "{currency}"'
+#         elif price.get("max"):
+#             price_query = f'MATCH (product)-[:HAS]->(price:Price) WHERE price.value <= {price.get("max")} AND price.currency = "{currency}"'
+
+#     required_props = params.get("requiredProperties", [])
+#     or_groups = build_or_groups(required_props)  # automatycznie generuje OR-grupy
+
+#     cypher_query = """
+# MATCH (product:Product)
+# WHERE any(l IN labels(product) WHERE replace(l, "-", "_") IN [pt IN $productTypes | replace(pt, "-", "_")])
+
+# """
+#     if params['producers']:
+#         cypher_query += """
+#     AND product.producer IN $producers
+#     """
+#     cypher_query += """
+# OPTIONAL MATCH (product)-[:HAS]->(prop:Property_PL)
+# """
+#     cypher_query += price_query
+#     cypher_query += """
+# WITH product, collect({
+#   name: prop.name,
+#   value: prop.value,
+#   unit: replace(prop.unit, ' ', '')
+# }) AS properties
+
+# WITH product, properties,
+#      size([
+#        group IN $orGroups WHERE
+#          size([
+#            reqProp IN $requiredProperties WHERE
+#              reqProp.name IN group AND size([
+#                prop IN properties WHERE
+#                  toLower(prop.name) = toLower(reqProp.name) AND
+#                  (
+#                    (apoc.meta.cypher.type(reqProp.value) IN ["LIST OF ANY", "LIST OF STRING"] AND toString(prop.value) IN reqProp.value) OR
+#                    (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) <> toLower(toString(reqProp.value))) OR
+#                    (reqProp.condition = '<>' AND apoc.meta.cypher.type(reqProp.value) <> 'STRING' AND prop.value <> reqProp.value) OR
+#                    (reqProp.condition = '<' AND prop.value < reqProp.value) OR
+#                    (reqProp.condition = '>' AND prop.value > reqProp.value) OR
+#                    (reqProp.condition = '<=' AND prop.value <= reqProp.value) OR
+#                    (reqProp.condition = '>=' AND prop.value >= reqProp.value) OR
+#                    ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'STRING' AND toLower(toString(prop.value)) = toLower(toString(reqProp.value))) OR
+#                    ((reqProp.condition IS NULL OR reqProp.condition = '=') AND apoc.meta.cypher.type(reqProp.value) = 'INTEGER' AND apoc.meta.cypher.type(prop.value) = 'STRING' AND prop.value STARTS WITH toString(reqProp.value)) OR
+#                    ((reqProp.condition IS NULL OR reqProp.condition = '=') AND (prop.value = reqProp.value))
+#                  ) AND
+#                  (reqProp.unit IS NULL OR replace(prop.unit, ' ', '') = replace(reqProp.unit, ' ', ''))
+#              ]) > 0
+#          ]) > 0
+#      ]) AS matchingGroupsCount
+
+# RETURN product, matchingGroupsCount
+# ORDER BY matchingGroupsCount DESC
+# """
+#     if return_parameters:
+#         cypher_query += ", properties"
+
+#     # wysyłamy parametry do Neo4j
+#     neo4j_params = params.copy()
+#     neo4j_params["orGroups"] = or_groups
+#     #print(cypher_query)
+#     print(neo4j_params)
+#     with driver.session() as session:
+#         result = session.run(cypher_query, neo4j_params)
+#         records = list(result)
+#         if not len(records):
+#             print("Brak wyników")
+#         #results = [record.data().get("product", {}) for record in records]
+#         # for record in results:
+#         #     if record.get("nameEmbedding"):
+#         #         del record["nameEmbedding"]
+#         #     if record.get("productNumberEmbedding"):
+#         #         del record["productNumberEmbedding"]
+        
+#         # return results
+
+#         results = []
+#         for record in records:
+#             product_dict = dict(record["product"])
+            
+#             # usuń embeddingi
+#             product_dict.pop("nameEmbedding", None)
+#             product_dict.pop("productNumberEmbedding", None)
+
+#             result_item = {
+#                 "product": product_dict,
+#                 "matchingGroupsCount": record["matchingGroupsCount"],
+#             }
+
+#             if return_parameters and "properties" in record:
+#                 result_item["properties"] = record["properties"]
+
+#             results.append(result_item)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def get_embedding(text, model="text-embedding-3-small"):
@@ -1044,20 +1394,24 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     times = {}
     app = Sanic.get_app()
 
-    try:
-        start = time.time()
-        data = analize_query(user_query)
-        end = time.time()
-        logger.debug(data)
-        logger.info(f"Analiza pytania (AI): {end - start} s")
-        times["Analiza pytania (AI)"] = end - start
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"1 Błąd podczas analizy pytania: {str(e)}",
-            "times": times,
-            "time": sum(times.values())
-        }
+    # try:
+    #     start = time.time()
+    #     data = analize_query(user_query)
+    #     end = time.time()
+    #     logger.debug(data)
+    #     logger.info(f"Analiza pytania (AI): {end - start} s")
+    #     times["Analiza pytania (AI)"] = end - start
+    # except Exception as e:
+    #     return {
+    #         "success": False,
+    #         "message": f"1 Błąd podczas analizy pytania: {str(e)}",
+    #         "times": times,
+    #         "time": sum(times.values())
+    #     }
+    # print("=====================")
+    # print(data)
+    # print("=====================")
+    data = {"types": ['szukanie']}
 
     types_query = user_query
     if "compatible_with-DELETE" in data:
@@ -1669,11 +2023,6 @@ def simple_search(user_query):
     }
 
 if __name__ == "__main__":
-
-    # client = openai.OpenAI(
-    #    api_key="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")
-
-
     task = "Telewizor LCD z ekranem 55 cali"
     _results = cypher_search(task)
     print(f"Status: {'Sukces' if _results.get('success', False) else 'Błąd'}")

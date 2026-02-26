@@ -1,13 +1,12 @@
 import json
 import time
+import os
 
 import openai
 from sanic import Sanic
 from sanic.log import logger
 
-client_gpt = openai.OpenAI(
-   api_key="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")
-
+client_gpt = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 def llm(prompt):
     print("services ai_search llm")
