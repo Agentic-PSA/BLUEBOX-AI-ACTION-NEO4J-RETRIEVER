@@ -1008,6 +1008,7 @@ RETURN product,
 
             product.pop("nameEmbedding", None)
             product.pop("productNumberEmbedding", None)
+            product["matchedOrGroupsCount%"] = round((data.get("matchedGroupsCount", 0) / max(len(or_groups), 1)) * 100, 2)
             product["matchedOrGroupsCount"] = data.get("matchedGroupsCount", 0)
             product["matchedGroups"] = data.get("matchedGroups", [])
             product["notMatchedGroups"] = data.get("notMatchedGroups", [])
