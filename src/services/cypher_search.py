@@ -990,7 +990,7 @@ RETURN product,
     if return_parameters:
         cypher_query += ", properties"
 
-    cypher_query += "ORDER BY matchedGroupsCount DESC"
+    cypher_query += " ORDER BY matchedGroupsCount DESC"
     # wysyłamy parametry do Neo4j
     neo4j_params = params.copy()
     neo4j_params["orGroups"] = or_groups
@@ -1411,7 +1411,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
     # print("=====================")
     # print(data)
     # print("=====================")
-    data = {"types": ['szukanie']}
+    data = {"types": [user_query]}
 
     types_query = user_query
     if "compatible_with-DELETE" in data:

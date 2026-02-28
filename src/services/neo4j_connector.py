@@ -1022,7 +1022,7 @@ RETURN product
         WITH t, gds.similarity.cosine(queryVector, t.nameEmbedding) AS similarity
         RETURN t.code AS type_code, t.name AS type_name, similarity
         ORDER BY similarity DESC
-        LIMIT 50
+        LIMIT 20
         """
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
@@ -1030,6 +1030,7 @@ RETURN product
         )
         query_vector = response.data[0].embedding
         properties = {"query_vector": query_vector}
+        print("Rozmiar embeddingu:", len(query_vector), "input", text)
         formatted_results = []
         with self.driver.session() as session:
             results = session.execute_read(self._execute_query_records, query, properties)
