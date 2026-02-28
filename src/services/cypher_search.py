@@ -33,7 +33,7 @@ def clean_json(text: str):
     return text
 
 def llm(prompt, model="gpt-4.1"):
-    return llm_gemini(prompt)
+    #return llm_gemini(prompt)
     print("services cypher_search llm")
     #model = "gpt-4.1-mini"
     #model = "gpt-4.1-nano"
