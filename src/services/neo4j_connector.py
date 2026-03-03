@@ -1022,7 +1022,7 @@ RETURN product
         WITH t, gds.similarity.cosine(queryVector, t.nameEmbedding) AS similarity
         RETURN t.code AS type_code, t.name AS type_name, similarity
         ORDER BY similarity DESC
-        LIMIT 20
+        LIMIT 10
         """
         response = self.client_gpt.embeddings.create(
             model=self.embeddings_model,
@@ -1054,8 +1054,8 @@ RETURN product
                 # Jeśli 3-ci wynik < 0.5, zwracamy wszystkie z similarity > 0
                 return [r for r in formatted_results if r["similarity"] > 0]
             else:
-                # Jeśli 3-ci wynik >= 0.5, zwracamy tylko pierwsze 20
-                return formatted_results[:20]  
+                # Jeśli 3-ci wynik >= 0.5, zwracamy tylko pierwsze 5
+                return formatted_results[:5]  
         return formatted_results
     
 

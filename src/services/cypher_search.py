@@ -12,6 +12,7 @@ from neo4j import GraphDatabase, Result
 from sanic import Sanic
 from sanic.log import logger
 from copy import deepcopy
+import copy
 
 import src.services.product_specification
 import src.services.db_schema
@@ -368,7 +369,7 @@ def flatten_attributes_with_dedup(sections):
     return flat
 
 
-
+#akaduda
 def generate_params(question, product_specification, labels):
     print("services cypher_search generate_params")
     print(labels)
@@ -382,7 +383,9 @@ def generate_params(question, product_specification, labels):
     # Zapytanie do LLM z elastycznym podejściem
     prompt = f'''
 Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie parametry do zapytania bazy danych.
+Podziel pracę na 3 kroki:
 
+KROK 1:
 1. Wypełnij pole "requiredProperties":
    - Tylko te pola, których wartości są podane w pytaniu i które występują w specyfikacji dla danego typu produktu.
    - Ustaw "unit" na null, jeśli nie jest potrzebne.
@@ -395,6 +398,7 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
    - Nie wypełniaj pól niezwiązanych bezpośrednio z produktem (np. marka, model).
    - Jeśli użytkownik pyta o parametr, który w specyfikacji jest rozbity na kilka osobnych atrybutów powiązanych, dodaj wszystkie te powiązane atrybuty do requiredProperties
    - Nie dodaj producenta do "requiredProperties". Od tego jest inne pole, opisane poniżej.
+   - Jeśli w zapytaniu masz informację w nawiasach kwadratowych [] - to jest to podpowiedź co do wyboru parametru
 
 2. Pomijaj parametry wynikające z nazwy kategorii
    - Nie dodawaj do requiredProperties parametrów, których wartość jest już zawarta w nazwie kategorii produktu.
@@ -416,14 +420,7 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
    - Jeśli atrybut ma klucz "values" → wybierz wszystkie pasujące wartości z listy (nie poprawiaj wielkości liter, błędów, odmiany ani stylu - tekst ma zostać skopiowany 1:1, nawet jeśli wygląda niepoprawnie)
    - Jeśli atrybut ma klucz "values", a nazwa atrybutu lub wartości wskazują na dane zakresowe → pomiń go
 
-7. Znajdź **wszystkie możliwe powiązania OR** między **znalezionymi** atrybutami:
-   - Podobieństwo nazw atrybutów (np. „Specyficzne potrzeby zwierzęcia” ↔ „Dodatkowe cechy”)
-   - Podobieństwo wartości (np. wspólne słowa kluczowe: „nadwaga”, „utrzymanie wagi”)
-   - Dla każdego atrybutu wstaw pole `"or_with"`: lista nazw powiązanych atrybutów które są w requiredProperties. Jeśli brak powiązań → pusty array.
-   - Powiązania OR twórz WYŁĄCZNIE pomiędzy atrybutami, które znalazły się w requiredProperties. 
-   - Nigdy nie analizuj ani nie wykorzystuj atrybutów, które nie zostały wybrane.
-
-8. Jeśli ten sam atrybut w specyfikacji występuje kilka razy w różnych jednostkach (np. kg i g) ale pod tą samą nazwą:
+7. Jeśli ten sam atrybut w specyfikacji występuje kilka razy w różnych jednostkach (np. kg i g) ale pod tą samą nazwą:
    ZASADA JEDNEGO PARAMETRU (OBOWIĄZKOWA — NIE WOLNO NARUSZYĆ):
    - Traktuj je jako JEDEN parametr i wybierz tylko jeden wariant.
      * Jeśli użytkownik poda jednostkę → wybierz wariant w tej jednostce.
@@ -432,10 +429,18 @@ Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie 
    - Nigdy nie twórz OR pomiędzy wariantami tego samego parametru (różne jednostki lub formaty nazwy).
      OR może łączyć wyłącznie różne parametry, nigdy alternatywne wersje jednego parametru.
 
+KROK 2:
+8. Znajdź **wszystkie możliwe powiązania OR** między **znalezionymi** atrybutami:
+   - Podobieństwo nazw atrybutów (np. „Specyficzne potrzeby zwierzęcia” ↔ „Dodatkowe cechy”)
+   - Jeśli dwa atrybuty opisują tę samą cechę produktu (np. forma, typ, rodzaj), a ich wartości są semantycznie równoważne lub zawierają te same słowa kluczowe w innej kolejności — MUSZĄ zostać połączone przez OR
+   - Dla każdego atrybutu wstaw pole `"or_with"`: lista nazw powiązanych atrybutów które są w requiredProperties. Jeśli brak powiązań → pusty array.
+   - Powiązania OR twórz WYŁĄCZNIE pomiędzy atrybutami, które znalazły się w requiredProperties. 
+   - Nigdy nie analizuj ani nie wykorzystuj atrybutów, które nie zostały wybrane.
+
+KROK 3:
 9. W polu advice1 wpisz informację, czy wszystko było dla Ciebie jasne, oraz co moglibyśmy poprawić w podpowiedzi i/lub danych wejściowych
 10. W polu advice2 wpisz informację, co możemy poprawić aby Twoja odpowiedź była szybsza (teraz odpowiadasz w zakresie 8-15 sekund, a powinieneś w max 5 sekund)
 11. W polu advice3 wpisz informację, jaki obecnie model LLM jest używany, a który byłby lepszy do tego zadania. Podaj nazwy modeli i ich wersje, np. gemini 1.5.flash
-12. Jeśli w zapytaniu masz informację w nawiasach kwadratowych [] - to jest to podpowiedź co do wyboru parametru
 
 Pytanie użytkownika:
 {question}
@@ -497,9 +502,71 @@ Odpowiedz w poprawnym formacie JSON:
     print('----------------response--------------')
     #print(params)
     # params["productTypes"] = labels
+
+    # popraw znane bledy
+    print('----------------params 1--------------')
+    print(params)
+    params = normalize_between_conditions(params)
+    print('----------------params 2--------------')
+    print(params)
     return params
 
 
+
+
+def normalize_between_conditions(params: dict) -> dict:
+    """
+    Rozbija warunki typu:
+        condition: "between"
+        value: [A, B]
+    na dwa osobne wpisy:
+        >= A
+        <= B
+    """
+
+    new_params = copy.deepcopy(params)
+
+    if "requiredProperties" not in new_params:
+        return new_params
+
+    normalized_properties = []
+
+    for prop in new_params["requiredProperties"]:
+
+        # Sprawdzenie czy to warunek between
+        if (
+            prop.get("condition") == "between"
+            and isinstance(prop.get("value"), list)
+            and len(prop["value"]) == 2
+        ):
+            lower, upper = prop["value"]
+
+            # Tworzymy dwa nowe warunki
+            lower_condition = {
+                "name": prop["name"],
+                "value": lower,
+                "unit": prop.get("unit"),
+                "condition": ">=",
+                "or_with": prop.get("or_with", [])
+            }
+
+            upper_condition = {
+                "name": prop["name"],
+                "value": upper,
+                "unit": prop.get("unit"),
+                "condition": "<=",
+                "or_with": prop.get("or_with", [])
+            }
+
+            normalized_properties.append(lower_condition)
+            normalized_properties.append(upper_condition)
+
+        else:
+            normalized_properties.append(prop)
+
+    new_params["requiredProperties"] = normalized_properties
+
+    return new_params
 
 def generate_params_OLD(question, product_specification, labels):
     print("services cypher_search generate_params")
@@ -513,7 +580,7 @@ Jeżeli użytkownik pyta o cenę podaj ją w polu price jako słownik z kluczami
 W polu currency podaj walutę ceny, jeżeli nie jest podana w pytaniu to PLN. Możliwe waluty: PLN, EUR, USD.
 Dostępne jednostki:
 m, in, nm, mm, cm, dm, g, mg, kg, t, s, ms, us, ns, min, h, d, Wh, kWh, MWh, GWh, Hz * mm ** 3, Hz * cm ** 3, Hz * m ** 3, m ** 3 / h, m ** 3 / s, W, kW, MW, GW, VA, kVA, MVA, GVA, Hz, kHz, MHz, GHz, bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, RPM, PLN, mmH2O, bit / s, kbit / s, Mbit / s, Gbit / s, B / s, kB / s, MB / s, GB / s, TB / s, lm / m ** 2, cd / m ** 2, lx, mm ** 3, cm ** 3, m ** 3, l, IOPS, lm, cd, °C, K, °F, Ah, A*s, mAh, EUR, AWG, str/min, Pa, kPa, MPa, GPa, dni, Ohm, szt, VAh, stron/min, stron/mies., ark., mmAq, szt., px, obr/min, stron, pages/min, sheets, CFM, TBW, spm, dBV/Pa, pages, son, m/s2, str/mies, arkuszy, str/mies., lanes, x mm, kWh/rok, miesiące, pages/month, Lux, max, lat, IOPs, st, arka, ark
-W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: =, <, >, <=, >, <>.
+W polu condition podaj znak warunku jeżeli wynika z pytania. Dostępne znaki: =, <, >, <=, >=, >, <>. Nie wolno Ci użyć innych (np. between).
 Znak warunku <> oznacza różny i działa też dla napisów. 
 Jeżeli użytkownik podał przedział wartości parametru zapisz go jako dwa oddzielne warunki używając odpowiednich znaków nierówności.
 Jeżeli użytkownik podał kilka możliwych wartości danego parametru podaj je w value jako listę.
@@ -900,7 +967,7 @@ RETURN product, matchedGroups
 
 
 
-
+#akaduda
 def exec_query(params, return_parameters=False):
     print("services cypher_search exec_query")
     price_query = ""
@@ -1010,14 +1077,19 @@ RETURN product,
             product.pop("productNumberEmbedding", None)
             product["matchedOrGroupsCount%"] = round((data.get("matchedGroupsCount", 0) / max(len(or_groups), 1)) * 100, 2)
             product["matchedOrGroupsCount"] = data.get("matchedGroupsCount", 0)
-            product["matchedGroups"] = data.get("matchedGroups", [])
-            product["notMatchedGroups"] = data.get("notMatchedGroups", [])
+            product["matchedGroups"] = array_to_pretty_string(data.get("matchedGroups", []))
+            product["notMatchedGroups"] = array_to_pretty_string(data.get("notMatchedGroups", []))
 
             results.append(product)            
 
         return results
 
 
+def array_to_pretty_string(data):
+    return "; ".join(
+        "[" + ", ".join(group) + "]"
+        for group in data
+    )
 
 
 # def exec_query(params, return_parameters=False):
@@ -1212,6 +1284,7 @@ Pytanie użytkownika:
     print(data)
     return data
 
+#akaduda
 def filter_types(user_query, types_response):
     print("services cypher_search filter_types")
     prompt = f'''
@@ -1505,25 +1578,25 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             times["Znalezienie możliwych wartości parametrów"] = end - start
             logger.info(params_values)
 
-            if params_values:
-                incorrect_params = get_incorrect_params(params, params_values)
-                logger.info(f"incorrect_params: {incorrect_params}")
-                if incorrect_params:
-                    original_params = params
-                    start = time.time()
-                    corrected_params = correct_generated_params(incorrect_params, params_values, user_query)
-                    logger.info(f"incorrect_params: {incorrect_params}")
-                    logger.info(f"corrected_params: {corrected_params}")
-                    corrected_params_dict = {}
-                    for param in corrected_params:
-                        corrected_params_dict[param.get("name")] = param.get("value")
-                    for param in params.get('requiredProperties', []):
-                        if param.get('name') in corrected_params_dict:
-                            param['value'] = corrected_params_dict[param.get('name')]
-                    end = time.time()
-                    logger.info(f"Poprawienie parametrów: {end - start} s")
-                    times["Poprawienie parametrów"] = end - start
-                    logger.info(params)
+            # if params_values:
+            #     incorrect_params = get_incorrect_params(params, params_values)
+            #     logger.info(f"incorrect_params: {incorrect_params}")
+            #     if incorrect_params:
+            #         original_params = params
+            #         start = time.time()
+            #         corrected_params = correct_generated_params(incorrect_params, params_values, user_query)
+            #         logger.info(f"incorrect_params: {incorrect_params}")
+            #         logger.info(f"corrected_params: {corrected_params}")
+            #         corrected_params_dict = {}
+            #         for param in corrected_params:
+            #             corrected_params_dict[param.get("name")] = param.get("value")
+            #         for param in params.get('requiredProperties', []):
+            #             if param.get('name') in corrected_params_dict:
+            #                 param['value'] = corrected_params_dict[param.get('name')]
+            #         end = time.time()
+            #         logger.info(f"Poprawienie parametrów: {end - start} s")
+            #         times["Poprawienie parametrów"] = end - start
+            #         logger.info(params)
         else:
             params = None
 
@@ -1682,7 +1755,6 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
             "times": times,
             "time": sum(times.values())
         }
-
 
     #Krok 2: Filtrowanie typów produktów
     try:
