@@ -51,9 +51,9 @@ def llm(prompt, model="gpt-4.1"):
     logger.debug(response)
     response_text = response.choices[0].message.content
     logger.debug(response_text)
-    # print("-------------")
-    # print(response_text)
-    # print("-------------")
+    print("-------------")
+    print(response_text)
+    print("-------------")
     return response_text
 
 def llm_gemini(prompt):
@@ -402,6 +402,7 @@ KROK 1:
 
 2. Pomijaj parametry wynikające z nazwy kategorii
    - Nie dodawaj do requiredProperties parametrów, których wartość jest już zawarta w nazwie kategorii produktu.
+   - Nie używaj pól o nazwie "Typ produktu"
    - Jeśli jednak dana cecha nie występuje w nazwie kategorii, ale występuje:
     * w pytaniu użytkownika lub
     * w specyfikacji produktu jako możliwa opcja
@@ -509,6 +510,9 @@ Odpowiedz w poprawnym formacie JSON:
     params = normalize_between_conditions(params)
     print('----------------params 2--------------')
     print(params)
+    # params = generate_params_fix_or_groups(params)
+    # print('----------------params 3--------------')
+    # print(params)
     return params
 
 
@@ -567,6 +571,119 @@ def normalize_between_conditions(params: dict) -> dict:
     new_params["requiredProperties"] = normalized_properties
 
     return new_params
+
+def generate_params_fix_or_groups(params):
+    print("services cypher_search generate_params_fix_or_groups")
+
+    # Zapytanie do LLM z elastycznym podejściem
+    prompt = f'''
+Zadanie:
+Na podstawie danych wejściowych znajdź WSZYSTKIE możliwe powiązania OR między atrybutami znajdującymi się w requiredProperties.
+
+Analizuj WYŁĄCZNIE atrybuty znajdujące się w requiredProperties.
+Nie twórz nowych atrybutów.
+Nie usuwaj żadnych atrybutów.
+
+-----------------------------------
+KROK 1 — ANALIZA SEMANTYCZNA WARTOŚCI
+-----------------------------------
+
+Dla każdego atrybutu wykonaj normalizację pojęciową:
+
+1. Zignoruj nazwę atrybutu jako kategorię biznesową.
+   Nazwa atrybutu NIE określa ontologii.
+   Analizuj znaczenie wartości.
+
+2. Dla każdej wartości wyodrębnij:
+   - byt główny (np. kawa, mleko, spieniacz, ekspres)
+   - cechę tego bytu (np. forma fizyczna, obecność, sposób działania, typ)
+   - wartość cechy w postaci rdzenia znaczeniowego (po uproszczeniu)
+
+3. Podczas normalizacji:
+   - sprowadź wyrazy do formy podstawowej (lematyzacja),
+   - ignoruj liczbę pojedynczą/mnogą,
+   - ignoruj odmianę fleksyjną,
+   - ignoruj szyk wyrazów,
+   - ignoruj różnice typu przymiotnik ↔ rzeczownik (np. „ziarnista” ↔ „ziarna”),
+   - ignoruj to, czy wartość jest tablicą czy stringiem.
+
+Przykład poprawnej normalizacji:
+"Kawa ziarnista" → byt: kawa | cecha: forma fizyczna | wartość: ziarno
+"Ziarna kawy" → byt: kawa | cecha: forma fizyczna | wartość: ziarno
+
+Jeśli po normalizacji reprezentacja jest identyczna — oznacza to tę samą właściwość.
+
+-----------------------------------
+KROK 2 — REGUŁY ŁĄCZENIA OR
+-----------------------------------
+
+Połącz dwa atrybuty przez OR, jeżeli spełniony jest przynajmniej jeden warunek:
+
+A) Mają ten sam byt główny ORAZ tę samą cechę ORAZ tę samą znormalizowaną wartość.
+
+B) Opisują tę samą fizyczną właściwość produktu, nawet jeśli:
+   - jeden brzmi jak kategoria („Typ produktu”),
+   - drugi jak parametr techniczny („Typ wkładu”).
+
+C) Jeden logicznie implikuje drugi
+   (np. funkcja = tak implikuje obecność modułu).
+
+Jeżeli dwa atrybuty zawierają ten sam główny rzeczownik (np. kawa)
+i ich wartości po redukcji wskazują na ten sam stan fizyczny,
+połączenie OR jest OBOWIĄZKOWE.
+
+Nie oceniaj kontekstu biznesowego.
+Nie oceniaj, czy atrybut jest „ogólny” czy „techniczny”.
+Liczy się wyłącznie zgodność bytu, cechy i wartości po normalizacji.
+
+-----------------------------------
+KROK 3 — ZASADY TECHNICZNE
+-----------------------------------
+
+1. Łączenia muszą być symetryczne:
+   - jeśli A ma w "or_with" B,
+     to B musi mieć w "or_with" A.
+
+2. Analizuj wszystkie możliwe pary atrybutów.
+
+3. Nie pomijaj żadnego przypadku identycznej reprezentacji pojęciowej.
+
+4. Jeśli brak powiązań — zostaw pustą tablicę.
+
+-----------------------------------
+FORMAT ODPOWIEDZI
+-----------------------------------
+
+Zwróć dane w IDENTYCZNYM formacie jak wejście,
+z uzupełnionym polem "or_with".
+
+Dodaj dodatkowe pole:
+"advice4": krótkie wyjaśnienie:
+- które atrybuty miały identyczny byt, cechę i wartość po normalizacji,
+- dlaczego zostały połączone.
+
+Nie dodawaj żadnych dodatkowych komentarzy poza JSON.
+Odpowiedź musi być poprawnym JSON.
+Parametry:
+{params}
+
+    '''
+    #response_text = llm(prompt, 'gpt-4.1-mini')
+    response_text = llm(prompt)
+    print(response_text)
+    params = json.loads(response_text)
+    return params
+
+
+
+
+
+
+
+
+
+
+
 
 def generate_params_OLD(question, product_specification, labels):
     print("services cypher_search generate_params")
@@ -968,8 +1085,8 @@ RETURN product, matchedGroups
 
 
 #akaduda
-def exec_query(params, return_parameters=False):
-    print("services cypher_search exec_query")
+def exec_query(params, return_parameters=False, notFullMatch=False):
+    print(f"services cypher_search exec_query, parameters={return_parameters}")
     price_query = ""
     price = params.get("price")
 
@@ -1079,8 +1196,16 @@ RETURN product,
             product["matchedOrGroupsCount"] = data.get("matchedGroupsCount", 0)
             product["matchedGroups"] = array_to_pretty_string(data.get("matchedGroups", []))
             product["notMatchedGroups"] = array_to_pretty_string(data.get("notMatchedGroups", []))
+            if return_parameters:
+                product["properties"] = data.get("properties", [])            
 
-            results.append(product)            
+            if notFullMatch:
+                results.append(product)
+            elif data.get("matchedGroupsCount", 0) == len(or_groups) and data.get("matchedGroupsCount", 0) > 0:
+                results.append(product)
+            elif len(or_groups) == 0:
+                results.append(product)
+                
 
         return results
 
@@ -1463,7 +1588,8 @@ def filter_none_params(params_values):
     return params_values
 
 
-def cypher_search(user_query, return_parameters=False, ai_answer=False):
+def cypher_search(user_query, return_parameters=False, notFullMatch=False):
+    ai_answer=False
     print("services cypher_search cypher_search")
     times = {}
     app = Sanic.get_app()
@@ -1857,7 +1983,7 @@ def cypher_search(user_query, return_parameters=False, ai_answer=False):
 
     try:
         start = time.time()
-        results = exec_query(params, return_parameters)
+        results = exec_query(params, return_parameters, notFullMatch)
         end = time.time()
         logger.info(f"Odpytanie bazy: {end - start} s")
         times["Odpytanie bazy"] = end - start

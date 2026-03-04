@@ -19,6 +19,8 @@
         }
     </style>
     <script>
+        var url = 'http://172.19.5.46:30713';
+        //var url = 'http://127.0.0.1:5013';
         async function sendSimpleSearchRequest() {
             const queryValue = document.getElementById('simple_search_query').value;
             const resultContainer = document.getElementById('result');
@@ -26,7 +28,7 @@
             loadingIcon.style.display = 'inline-block';
             resultContainer.textContent = '';
             try {
-                const response = await fetch('http://172.19.5.46:30713/simple_search', {
+                const response = await fetch(url+'/simple_search', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -45,18 +47,18 @@
         async function sendSearchRequest() {
             const queryValue = document.getElementById('query').value;
             const parametersValue = document.getElementById('parameters').checked;
-            const aiValue = document.getElementById('ai').checked;
+            const notFullMatchValue = document.getElementById('notfullmatch').checked;
             const resultContainer = document.getElementById('result');
             const loadingIcon = document.getElementById('loading');
             loadingIcon.style.display = 'inline-block';
             resultContainer.textContent = '';
             try {
-                const response = await fetch('http://172.19.5.46:30713/search', {
+                const response = await fetch(url+'/search', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: queryValue, parameters: parametersValue, ai: aiValue })
+                    body: JSON.stringify({ query: queryValue, parameters: parametersValue, notFullMatch: notFullMatchValue })
                 });
                 const result = await response.json();
                 resultContainer.textContent = JSON.stringify(result, null, 2);
@@ -73,7 +75,7 @@
             const resultContainer = document.getElementById('result');
             const parametersValue = document.getElementById('parameters').checked;
             try {
-                const response = await fetch('http://172.19.5.46:30713/get_product', {
+                const response = await fetch(url+'/get_product', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -92,7 +94,7 @@
             const resultContainer = document.getElementById('result');
             const parametersValue = document.getElementById('parameters').checked;
             try {
-                const response = await fetch('http://172.19.5.46:30713/get_product', {
+                const response = await fetch(url+'/get_product', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -111,7 +113,7 @@
             const resultContainer = document.getElementById('result');
             const parametersValue = document.getElementById('parameters').checked;
             try {
-                const response = await fetch('http://172.19.5.46:30713/get_product', {
+                const response = await fetch(url+'/get_product', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -134,8 +136,8 @@
     <textarea id="query" placeholder="Enter query" rows="2" style="resize: both;"></textarea>
     <input type="checkbox" id="parameters">
     Pokaż parametry
-    <input type="checkbox" id="ai">
-    AI
+    <input type="checkbox" id="notfullmatch">
+    &lt;100%
     <button onclick="sendSearchRequest()" id="button1" type="submit" >Search</button>
 
     <div id="loading">⏳ Loading...</div>

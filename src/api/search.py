@@ -23,11 +23,13 @@ class Search(HTTPMethodView):
         query = query.replace("::", ":")
         parameters = form.cleaned_data.get('parameters', False)
         logger.debug(f"parameters: {parameters}")
-        ai_answer = form.cleaned_data.get('ai', False)
-        if ai_answer:
-            response = ai_search(query, parameters)
-        else:
-            response = cypher_search(query, parameters)
+        # ai_answer = form.cleaned_data.get('ai', False)
+        # if ai_answer:
+        #     response = ai_search(query, parameters)
+        # else:
+        #     response = cypher_search(query, parameters)
+        notFullMatch = form.cleaned_data.get('notFullMatch', False)
+        response = cypher_search(query, parameters, notFullMatch)
         if not response:
             return JSONResponse(body={"error": "Error"}, status=404)
 
