@@ -381,6 +381,10 @@ def generate_params(question, product_specification, labels):
     #     json.dump(flatten_attributes_with_dedup(merge_sections(product_specification)), f, ensure_ascii=False, indent=2)
 
     # Zapytanie do LLM z elastycznym podejściem
+# 2. Pomijaj parametry wynikające z nazwy kategorii
+#    - Nie dodawaj do requiredProperties parametrów, których wartość jest już zawarta w nazwie kategorii produktu.
+#    - Nie używaj pól o nazwie "Typ produktu"
+#    - Jeśli jednak dana cecha nie występuje w nazwie kategorii, ale występuje:
     prompt = f'''
 Na podstawie pytania użytkownika i specyfikacji produktów wybierz odpowiednie parametry do zapytania bazy danych.
 Podziel pracę na 3 kroki:
@@ -402,7 +406,6 @@ KROK 1:
 
 2. Pomijaj parametry wynikające z nazwy kategorii
    - Nie dodawaj do requiredProperties parametrów, których wartość jest już zawarta w nazwie kategorii produktu.
-   - Nie używaj pól o nazwie "Typ produktu"
    - Jeśli jednak dana cecha nie występuje w nazwie kategorii, ale występuje:
     * w pytaniu użytkownika lub
     * w specyfikacji produktu jako możliwa opcja
@@ -1085,7 +1088,7 @@ RETURN product, matchedGroups
 
 
 #akaduda
-def exec_query(params, return_parameters=False, notFullMatch=False):
+def exec_query(params, return_parameters=False, notFullMatch=False, user_query=''):
     print(f"services cypher_search exec_query, parameters={return_parameters}")
     price_query = ""
     price = params.get("price")
@@ -1169,17 +1172,21 @@ WHERE matchedGroupsCount >= CASE
 RETURN product, 
        matchedGroupsCount,
        matchedGroups,
-       notMatchedGroups
+       notMatchedGroups,
+       [p IN properties 
+            WHERE p.default_unit IS NULL OR p.default_unit = true
+       ] AS properties
+ORDER BY matchedGroupsCount DESC
 """
-    if return_parameters:
-        cypher_query += ", properties"
-
-    cypher_query += " ORDER BY matchedGroupsCount DESC"
+    #cypher_query += ", properties"
+    #cypher_query += " ORDER BY matchedGroupsCount DESC"
     # wysyłamy parametry do Neo4j
     neo4j_params = params.copy()
     neo4j_params["orGroups"] = or_groups
     #print(cypher_query)
     print(neo4j_params)
+    was_100 = False
+    was_100_cnt = 0
     with driver.session() as session:
         result = session.run(cypher_query, neo4j_params)
         records = list(result)
@@ -1196,17 +1203,31 @@ RETURN product,
             product["matchedOrGroupsCount"] = data.get("matchedGroupsCount", 0)
             product["matchedGroups"] = array_to_pretty_string(data.get("matchedGroups", []))
             product["notMatchedGroups"] = array_to_pretty_string(data.get("notMatchedGroups", []))
-            if return_parameters:
-                product["properties"] = data.get("properties", [])            
+            product["properties"] = data.get("properties", [])            
 
+            if data.get("matchedGroupsCount", 0) == len(or_groups) and data.get("matchedGroupsCount", 0) > 0:
+                was_100 = True
+                was_100_cnt += 1
+            
             if notFullMatch:
                 results.append(product)
             elif data.get("matchedGroupsCount", 0) == len(or_groups) and data.get("matchedGroupsCount", 0) > 0:
                 results.append(product)
             elif len(or_groups) == 0:
                 results.append(product)
-                
 
+        if not was_100:
+            eans = check_results(user_query, results)
+            if eans:
+                results = [p for p in results if p["EAN"] in eans]
+            else:
+                results = []
+
+        if not return_parameters:
+            for res in results:
+                res.pop("properties", None)
+
+        print("ZNALEZIONO:", len(results), "100%:", was_100_cnt)
         return results
 
 
@@ -1215,6 +1236,31 @@ def array_to_pretty_string(data):
         "[" + ", ".join(group) + "]"
         for group in data
     )
+
+
+def check_results(user_query, results):
+    print("check_results")
+
+    prompt = f'''
+Na podstawie pytania użytkownika i danych produktów, znajdź tylko te produkty, które spełniają pytanie użytkownika.
+
+Pytanie użytkownika:
+{user_query}
+
+Produkty:
+{results[:50]}
+
+Odpowiedz w poprawnym formacie JSON. Jako wynik daj tablicę EAN'ów znalezionych produktów. W polu advice umieść informację czy instrukcja była jasna i co można poprawić.
+{{"eans": ["ean1", "ean2"], "advice":"Twoja odpowiedź"}}
+    '''
+
+    response_text = llm(prompt)
+    # print('----------------response check--------------')
+    print(response_text)
+    response = json.loads(response_text)
+    # print('----------------response check--------------')
+    print(response)
+    return response["eans"]
 
 
 # def exec_query(params, return_parameters=False):
@@ -1983,7 +2029,7 @@ def cypher_search(user_query, return_parameters=False, notFullMatch=False):
 
     try:
         start = time.time()
-        results = exec_query(params, return_parameters, notFullMatch)
+        results = exec_query(params, return_parameters, notFullMatch, user_query)
         end = time.time()
         logger.info(f"Odpytanie bazy: {end - start} s")
         times["Odpytanie bazy"] = end - start
