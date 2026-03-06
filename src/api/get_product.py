@@ -6,6 +6,32 @@ from sanic.response import JSONResponse
 from .forms.get_product import GetProductForm
 from src.services.product_specification import get_form_data_many
 
+# ComponentCollection
+# {	
+# 	ComponentItemID
+# 	ComponentQty
+# }	
+# RelatedProductCollection
+# {	
+# 	ProductNumber
+# 	RelationType
+# 	RelationNo
+# }	
+# Speccollection
+# {		
+# 	Sekcja id	string
+# 	Atrybut id	string
+# 	Wartość	string
+# 	Language id	
+# }		
+# Photocollection
+# {	
+# 	Photolink
+# }	
+# FileCollection?
+# {	
+# 	Filelink
+# }	
 class GetProduct(HTTPMethodView):
     @staticmethod
     async def post(request: Request) -> JSONResponse:
@@ -45,6 +71,10 @@ class GetProduct(HTTPMethodView):
                                 attributes_basic.append(attr.get("PL"))
                 to_add = []
                 for resp in response:
+                    resp["ComponentCollection"] = [{"ComponentItemID":"TEST", "ComponentQty":1}]
+                    resp["RelatedProductCollection"] = [{"ProductNumber":"TEST", "RelationType":"Related", "RelationNo":1},{"ProductNumber":"TEST", "RelationType":"Duplicate", "RelationNo":1}]
+                    resp["Photocollection"] = [{"Photolink":"https://magazyn.rogala.com.pl/uploads/eans/05828746/1-rogala-daino_reale_brecia_poler_gr_2cm_extra-05828746-crop2.jpg"}]
+                    resp["FileCollection"] = [{"Filelink":"https://magazyn.rogala.com.pl/uploads/eans/05828746/1-rogala-daino_reale_brecia_poler_gr_2cm_extra-05828746-crop2.jpg"}]
                     for prop in resp.get("properties", []):
                         if prop.get("name") in attributes_basic:
                             prop_copy = prop.copy()

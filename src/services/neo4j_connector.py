@@ -612,6 +612,31 @@ RETURN product
                 }
         return None
 
+    def get_pim_data(self, action: str):
+        with self.get_neo4j_session() as session:
+            query = """
+            MATCH (p:Product {action: $action})-[:ENRICHED_BY]->(pd:PIM_Data)
+            RETURN p.name AS name,
+                   p.nameEN AS nameEN,
+                   p.nameDE AS nameDE,
+                   p.action AS action,
+                   properties(pd) AS pim_data
+            LIMIT 1
+            """
+            properties = {"action": action}
+            result = session.execute_read(self._execute_query_multiple, query, properties)
+            logger.debug(result)
+            if result:
+                return {
+                    "name": result[0][0],
+                    "nameEN": result[0][1],
+                    "nameDE": result[0][2],
+                    "action": result[0][3],
+                    "pim_data": result[0][4]
+                }
+        return None
+
+
     def get_product_with_parameters(self, ean: str):
         print("services neo4j get_product_with_parameters")
         variants = self.generate_ean_variants(ean)
@@ -1142,7 +1167,6 @@ RETURN product
         result = tx.run(query, ean1=ean1, ean2=ean2,
                         props1=relationship_properties1, props2=relationship_properties2)
         return result.single()
-
 
     def get_products(self, skip=0, limit=100):
         print("services neo4j get_products")

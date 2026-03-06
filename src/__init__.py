@@ -9,7 +9,7 @@ from .services import Neo4jConnector
 from .utils import UnitConverter
 
 from .api import AddNode, AddType, AddProduct, Cypher, Compatibility, PropertiesValues, AddValues, Units, AddPrices, CheckQuantity
-from .api import GetProduct, GetProducts, Search, SimpleSearch
+from .api import GetProduct, GetProductParameters, GetProducts, Search, SimpleSearch
 from sanic import Sanic, response
 
 
@@ -24,7 +24,8 @@ def get_app(root_path: str) -> Sanic:
 
     app.ctx.NEO4J = Neo4jConnector()
 
-    app.add_route(GetProduct.as_view(), 'get_product/')
+    app.add_route(GetProduct.as_view(), 'get_product/') #parametry techniczne, zdjecia i pliki )pola 27-30)
+    app.add_route(GetProductParameters.as_view(), 'get_product_parameters/') #dane podstawowe kartoteki (pola 2-26)
     app.add_route(GetProducts.as_view(), 'get_products/')
     app.add_route(Search.as_view(), 'search/')
     app.add_route(SimpleSearch.as_view(), 'simple_search/')
