@@ -705,7 +705,7 @@ RETURN product
                     MATCH (product:Product {action: $action})
                     RETURN apoc.map.merge(
                         {labels: labels(product)},
-                        apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action'])
+                        apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action', 'Photocollection', 'FileCollection'])
                     ) AS product
                 """
             properties = {"action": action_code}
@@ -719,11 +719,12 @@ RETURN product
             results_with_properties = []
 
             for result in results[0]:
-                ean = result.get("EAN", "")
+                action = result.get("action", "")
                 labels = result.get("labels", [])
-                logger.debug(f"ean: {ean}")
+                #logger.debug(f"ean: {ean}")
+#                    MATCH (prod:Product {EAN: $ean})
                 query = """
-                    MATCH (prod:Product {EAN: $ean})
+                    MATCH (prod:Product {action: $action})
                     OPTIONAL MATCH (prod)-[r:HAS]->(prop:Property_PL)
                     WHERE prop.default_unit IS NULL OR prop.default_unit = true
                     WITH prod, 
@@ -750,10 +751,13 @@ RETURN product
                       producer: prod.producer,
                       action: prod.action,
                       product_number: prod.product_number,
+                      Photocollection: coalesce(prod.Photocollection, "[]"),
+                      FileCollection: coalesce(prod.FileCollection, "[]"),
                       properties: sorted_properties
                     } AS product
                                 """
-                properties = {"ean": ean}
+                #properties = {"ean": ean}
+                properties = {"action": action}
                 result_with_properties = session.execute_read(self._execute_query, query, properties)
                 product_data = result_with_properties[0]
                 product_data["labels"] = labels
