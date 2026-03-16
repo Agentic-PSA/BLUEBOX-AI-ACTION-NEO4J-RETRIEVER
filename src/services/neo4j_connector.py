@@ -705,7 +705,7 @@ RETURN product
                     MATCH (product:Product {action: $action})
                     RETURN apoc.map.merge(
                         {labels: labels(product)},
-                        apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action', 'Photocollection', 'FileCollection'])
+                        apoc.map.submap(product, ['EAN', 'name', 'producer', 'product_number', 'action', 'Photocollection', 'Filecollection'])
                     ) AS product
                 """
             properties = {"action": action_code}
@@ -752,7 +752,7 @@ RETURN product
                       action: prod.action,
                       product_number: prod.product_number,
                       Photocollection: coalesce(prod.Photocollection, "[]"),
-                      FileCollection: coalesce(prod.FileCollection, "[]"),
+                      Filecollection: coalesce(prod.Filecollection, "[]"),
                       properties: sorted_properties
                     } AS product
                                 """

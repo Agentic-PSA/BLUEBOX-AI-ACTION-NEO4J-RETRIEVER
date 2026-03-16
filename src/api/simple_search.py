@@ -1,4 +1,5 @@
 import re
+import json
 
 from sanic.log import logger
 from sanic.request import Request
@@ -25,6 +26,17 @@ class SimpleSearch(HTTPMethodView):
         if not response:
             return JSONResponse(body={"error": "Error"}, status=404)
 
+        for resp in response.get("results",[]):
+            value_p = resp.get("Photocollection")
+            if isinstance(value_p, str):
+                resp["Photocollection"] = json.loads(value_p)
+            elif value_p is None:
+                resp["Photocollection"] = []
+            value_f = resp.get("Filecollection")
+            if isinstance(value_f, str):
+                resp["Filecollection"] = json.loads(value_f)
+            elif value_f is None:
+                resp["Filecollection"] = []
 
         return JSONResponse(body=response)
 

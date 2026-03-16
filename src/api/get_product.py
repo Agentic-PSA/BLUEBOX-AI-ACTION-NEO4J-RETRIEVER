@@ -29,7 +29,7 @@ import json
 # {	
 # 	Photolink
 # }	
-# FileCollection?
+# Filecollection?
 # {	
 # 	Filelink
 # }	
@@ -66,12 +66,12 @@ class GetProduct(HTTPMethodView):
                     if isinstance(value_p, str):
                         resp["Photocollection"] = json.loads(value_p)
                     elif value_p is None:
-                        resp["Photocollection"] = []     
-                    value_f = resp.get("FileCollection")           
+                        resp["Photocollection"] = []
+                    value_f = resp.get("Filecollection")
                     if isinstance(value_f, str):
-                        resp["FileCollection"] = json.loads(value_f)
+                        resp["Filecollection"] = json.loads(value_f)
                     elif value_f is None:
-                        resp["FileCollection"] = []     
+                        resp["Filecollection"] = []
 
 
             if parameters and response[0].get("labels"):
