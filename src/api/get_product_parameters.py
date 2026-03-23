@@ -5,6 +5,7 @@ from sanic.response import JSONResponse
 
 from .forms.get_product import GetProductForm
 from src.services.product_specification import get_form_data_many
+import json
 
 # PIMProductId
 # Brand
@@ -44,32 +45,52 @@ class GetProductParameters(HTTPMethodView):
         if response:
             pd = response.get("pim_data", {})
             result["action"] = response.get("action", '')
-            result["Name"] = response.get("name", '')
-            result["NameEN"] = response.get("NameEN", '')
-            result["NameDE"] = response.get("NameDE", '')
             result["PIMProductId"] = pd.get("PIMProductId", '')
             result["Brand"] = pd.get("Brand", '')
-            result["CategoryMapCollection"] = pd.get("CategoryMapCollection", [])
+            CategoryMapCollection = pd.get("CategoryMapCollection")
+            if isinstance(CategoryMapCollection, str):
+                result["CategoryMapCollection"] = json.loads(CategoryMapCollection)
+            elif CategoryMapCollection is None:
+                result["CategoryMapCollection"] = []
             result["ProductType"] = pd.get("ProductType", '')
-            result["TranslationCollection"] = pd.get("TranslationCollection", [])
+            result["NamePL"] = response.get("NamePL", '') #nazwa fakturowa PL
+            result["NameEN"] = response.get("NameEN", '') #mazwa fakturowa EN
+            result["NameDE"] = response.get("NameDE", '') #mazwa fakturowa DE
+            result["NameISerwisPL"] = response.get("NameISerwisPL", '')
+            result["NameISerwisEN"] = response.get("NameISerwisEN", '')
+            result["NameISerwisDE"] = response.get("NameISerwisDE", '')
             result["SferisName"] = pd.get("SferisName", '')
             result["CNCode"] = pd.get("", '')
             result["PKWiU"] = pd.get("PKWiU", '')
             result["Intrastatname"] = pd.get("", '')
             result["IntrastatnameLong"] = pd.get("", '')
             result["CountryOfOrigin"] = pd.get("", '')
-            result["Weight"] = pd.get("Height", '')
-            result["Height"] = pd.get("", '')
-            result["Width"] = pd.get("", '')
-            result["Depth"] = pd.get("Depth", '')
-            result["ProducerGPSR"] = pd.get("", '')
-            result["ImporterGPSR"] = pd.get("", '')
-            result["Piktograms"] = pd.get("", '')
+            result["Weight"] = pd.get("Height", '') #w gramach
+            result["Height"] = pd.get("", '') #w mm
+            result["Width"] = pd.get("", '') #w mm
+            result["Depth"] = pd.get("Depth", '') #w mm
+            result["ProducerGPSR"] = pd.get("", '') #"Lista pól: Nazwa Producenta	Ulica	Nr domu	Kod pocztowy	Miasto	Kraj	Nr kierunkowy	Nr telefonu	Email"
+            result["ImporterGPSR"] = pd.get("", '') #"Lista pól: Nazwa Producenta	Ulica	Nr domu	Kod pocztowy	Miasto	Kraj	Nr kierunkowy	Nr telefonu	Email"
+            result["Piktograms"] = pd.get("", '') #słownik
+                # 851070 – Substancje łatwopalne
+                # 851071 – Substancje pod ciśnieniem
+                # 851072 – Drażniące lub szkodliwe
+                # 851073 – Korozja
+                # 851082 – Toksyczne dla zdrowia
+                # 851103 – Materiały wybuchowe
+                # 831752 – GHS01: Substancje wybuchowe
+                # 830908 – GHS02: Flammable
+                # 831754 – GHS03: Substancje utleniające
+                # 831753 – GHS04: Gazy pod ciśnieniem
+                # 830057 – GHS05: Corrosive
+                # 831755 – GHS06: Toxic
+                # 807686 – GHS07: Szkodliwy
             result["EnergyLabel"] = pd.get("", '')
-            result["Battery100Wh"] = pd.get("Battery100Wh", '')
-            result["InstalledBattery"] = pd.get("InstalledBattery", '')
-            result["LooseBattery"] = pd.get("LooseBattery", '')
+            result["Battery100Wh"] = pd.get("Battery100Wh", '') #czy bateria w zestawie
+            result["InstalledBattery"] = pd.get("InstalledBattery", '') #czy bateria zainstalowana
+            result["LooseBattery"] = pd.get("LooseBattery", '') #czy bateria luzem
             result["Large"] = pd.get("Large", '')
+            #result["TranslationCollection"] = pd.get("TranslationCollection", [])
             return JSONResponse(body=result)
         if not response:
             return JSONResponse(body={"error": "Product not found"}, status=404)
