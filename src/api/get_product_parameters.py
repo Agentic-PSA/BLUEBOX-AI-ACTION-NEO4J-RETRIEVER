@@ -53,12 +53,12 @@ class GetProductParameters(HTTPMethodView):
             elif CategoryMapCollection is None:
                 result["CategoryMapCollection"] = []
             result["ProductType"] = pd.get("ProductType", '')
-            result["NamePL"] = response.get("NamePL", '') #nazwa fakturowa PL
-            result["NameEN"] = response.get("NameEN", '') #mazwa fakturowa EN
-            result["NameDE"] = response.get("NameDE", '') #mazwa fakturowa DE
-            result["NameISerwisPL"] = response.get("NameISerwisPL", '')
-            result["NameISerwisEN"] = response.get("NameISerwisEN", '')
-            result["NameISerwisDE"] = response.get("NameISerwisDE", '')
+            result["NamePL"] = response.get("namePL", '') #nazwa fakturowa PL
+            result["NameEN"] = response.get("nameEN", '') #mazwa fakturowa EN
+            result["NameDE"] = response.get("nameDE", '') #mazwa fakturowa DE
+            result["NameISerwisPL"] = response.get("nameISerwisPL", '')
+            result["NameISerwisEN"] = response.get("nameISerwisEN", '')
+            result["NameISerwisDE"] = response.get("nameISerwisDE", '')
             result["SferisName"] = pd.get("SferisName", '')
             result["CNCode"] = pd.get("", '')
             result["PKWiU"] = pd.get("PKWiU", '')
